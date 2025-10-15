@@ -1,7 +1,7 @@
-// تنظیمات Thingspeak
+// تنظیمات Thingspeak - با Channel ID جدیدت
 const THINGSPEAK_API_KEY = 'FOB57VQ57OC6VAP8';
-const THINGSPEAK_CHANNEL_ID = '3116788'; // باید از Thingspeak بگیریش
-const UPDATE_INTERVAL = 5000; // 5 ثانیه
+const THINGSPEAK_CHANNEL_ID = '3116788'; // 🔥 اینجا رو عوض کردم
+const UPDATE_INTERVAL = 5000;
 
 // موقعیت سطل
 const trashLocation = {
@@ -14,7 +14,6 @@ let map;
 let marker;
 
 function initMap() {
-    // ایجاد نقشه
     map = new google.maps.Map(document.getElementById('map'), {
         zoom: 15,
         center: trashLocation,
@@ -22,7 +21,6 @@ function initMap() {
         streetViewControl: false
     });
 
-    // ایجاد مارکر
     marker = new google.maps.Marker({
         position: trashLocation,
         map: map,
@@ -33,7 +31,6 @@ function initMap() {
         }
     });
 
-    // اینفوویندو
     const infowindow = new google.maps.InfoWindow({
         content: `
             <div style="padding: 10px;">
@@ -54,6 +51,8 @@ async function fetchData() {
         const response = await fetch(`https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/feeds/last.json?api_key=${THINGSPEAK_API_KEY}`);
         const data = await response.json();
         
+        console.log('📊 داده دریافتی از Thingspeak:', data);
+        
         if (data && data.field1) {
             updateDashboard(data);
         } else {
@@ -63,6 +62,9 @@ async function fetchData() {
         console.error('خطا در دریافت داده:', error);
         document.getElementById('connectionStatus').textContent = '🔴 قطع';
         document.getElementById('connectionStatus').style.color = '#e74c3c';
+        
+        // بعد از 3 ثانیه دوباره تلاش کن
+        setTimeout(fetchData, 3000);
     }
 }
 
@@ -70,6 +72,8 @@ async function fetchData() {
 function updateDashboard(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
+    const latitude = parseFloat(data.field3);
+    const longitude = parseFloat(data.field4);
     const isFull = parseInt(data.field5) === 1;
     
     // آپدیت نوار پیشرفت
@@ -105,8 +109,26 @@ function updateDashboard(data) {
     document.getElementById('connectionStatus').textContent = '🟢 متصل';
     document.getElementById('connectionStatus').style.color = '#27ae60';
     
+    // آپدیت موقعیت اگر داده جدید داریم
+    if (latitude && longitude && latitude !== 0 && longitude !== 0) {
+        updateMapLocation(latitude, longitude);
+    }
+    
     // اضافه کردن به تاریخچه
     addToHistory(fillPercentage, distance);
+}
+
+// آپدیت موقعیت روی نقشه
+function updateMapLocation(lat, lng) {
+    if (map && marker) {
+        const newLocation = { lat: lat, lng: lng };
+        map.setCenter(newLocation);
+        marker.setPosition(newLocation);
+        
+        // آپدیت اطلاعات موقعیت در صفحه
+        document.getElementById('coordinatesText').textContent = 
+            `مختصات: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
 }
 
 // اضافه کردن به تاریخچه
@@ -130,22 +152,9 @@ function addToHistory(percentage, distance) {
     }
 }
 
-// شبیه‌سازی داده برای تست (اگر Thingspeak وصل نشد)
-function simulateData() {
-    const simulatedData = {
-        field1: Math.floor(Math.random() * 100),
-        field2: (5 + Math.random() * 20).toFixed(1),
-        field5: Math.random() > 0.7 ? 1 : 0
-    };
-    
-    updateDashboard(simulatedData);
-    document.getElementById('connectionStatus').textContent = '🟡 حالت آزمایشی';
-    document.getElementById('connectionStatus').style.color = '#f39c12';
-}
-
 // شروع برنامه
 document.addEventListener('DOMContentLoaded', function() {
-    // تنظیم موقعیت
+    // تنظیم موقعیت اولیه
     document.getElementById('locationText').textContent = trashLocation.name;
     document.getElementById('coordinatesText').textContent = 
         `مختصات: ${trashLocation.lat.toFixed(6)}, ${trashLocation.lng.toFixed(6)}`;
@@ -153,11 +162,4 @@ document.addEventListener('DOMContentLoaded', function() {
     // شروع دریافت داده
     fetchData();
     setInterval(fetchData, UPDATE_INTERVAL);
-    
-    // فال‌بک برای حالت آزمایشی
-    setTimeout(() => {
-        if (document.getElementById('connectionStatus').textContent === '🔴 قطع') {
-            simulateData();
-        }
-    }, 3000);
 });
