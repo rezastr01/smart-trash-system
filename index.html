@@ -3,89 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سطل زباله هوشمند - پنل مدیریت</title>
+    <title>سیستم مدیریت سطل‌های زباله هوشمند</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🚮 سیستم مدیریت سطل زباله هوشمند</h1>
-            <p>پایش لحظه‌ای وضعیت سطل‌های زباله شهری</p>
+            <h1>🚮 سیستم مدیریت سطل‌های زباله هوشمند</h1>
+            <p>پایش لحظه‌ای سطل‌های زباله در سطح شهر - مدیریت هوشمند پسماند</p>
         </header>
 
-        <div class="dashboard">
-            <!-- کارت وضعیت سطل -->
-            <div class="status-card" id="statusCard">
-                <div class="status-icon">📊</div>
-                <div class="status-info">
-                    <h3>وضعیت سطل</h3>
-                    <div class="status" id="statusText">درحال بارگذاری...</div>
-                    <div class="percentage" id="percentageText">-</div>
+        <!-- دشبورد کلی -->
+        <div class="overview-cards">
+            <div class="overview-card">
+                <div class="overview-icon">🗑️</div>
+                <div class="overview-info">
+                    <h3>تعداد سطل‌ها</h3>
+                    <div class="overview-value" id="totalTrashCans">1</div>
                 </div>
             </div>
-
-            <!-- کارت موقعیت -->
-            <div class="location-card">
-                <div class="location-icon">📍</div>
-                <div class="location-info">
-                    <h3>موقعیت سطل</h3>
-                    <div id="locationText">دانشگاه مهارت ملی</div>
-                    <div id="coordinatesText">مختصات: 46.268571, 38.043959</div>
+            <div class="overview-card">
+                <div class="overview-icon">🟢</div>
+                <div class="overview-info">
+                    <h3>سطل‌های خالی</h3>
+                    <div class="overview-value" id="emptyTrashCans">1</div>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-icon">🔴</div>
+                <div class="overview-info">
+                    <h3>سطل‌های پر</h3>
+                    <div class="overview-value" id="fullTrashCans">0</div>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-icon">📡</div>
+                <div class="overview-info">
+                    <h3>وضعیت آنلاین</h3>
+                    <div class="overview-value" id="onlineStatus">آنلاین</div>
                 </div>
             </div>
         </div>
 
-        <!-- نوار پیشرفت -->
-        <div class="progress-section">
-            <h3>🎯 میزان پرشدگی سطل</h3>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="progress-labels">
-                <span>خالی</span>
-                <span id="fillPercentage">0%</span>
-                <span>پر</span>
-            </div>
-        </div>
-
-        <!-- نقشه -->
+        <!-- نقشه اصلی -->
         <div class="map-section">
-            <h3>🗺️ موقعیت روی نقشه</h3>
+            <h3>🗺️ نقشه موقعیت سطل‌ها</h3>
+            <div class="map-legend">
+                <div class="legend-item">
+                    <div class="legend-color green"></div>
+                    <span>سطل خالی</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color orange"></div>
+                    <span>سطل نیمه پر</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color red"></div>
+                    <span>سطل پر</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color gray"></div>
+                    <span>آفلاین</span>
+                </div>
+            </div>
             <div id="map"></div>
         </div>
 
-        <!-- اطلاعات لحظه‌ای -->
-        <div class="live-data">
-            <h3>📈 اطلاعات لحظه‌ای</h3>
-            <div class="data-grid">
-                <div class="data-item">
-                    <span class="data-label">فاصله اندازه‌گیری شده:</span>
-                    <span class="data-value" id="distanceText">-</span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label">آخرین بروزرسانی:</span>
-                    <span class="data-value" id="lastUpdate">-</span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label">وضعیت اتصال:</span>
-                    <span class="data-value" id="connectionStatus">🔴 قطع</span>
-                </div>
+        <!-- لیست سطل‌ها -->
+        <div class="trash-list-section">
+            <h3>📋 لیست سطل‌ها</h3>
+            <div class="trash-list" id="trashList">
+                <!-- سطل‌ها به صورت داینامیک اضافه میشن -->
             </div>
         </div>
 
-        <!-- تاریخچه -->
-        <div class="history-section">
-            <h3>📋 تاریخچه وضعیت</h3>
-            <div class="history-list" id="historyList">
-                <!-- تاریخچه به صورت داینامیک اضافه میشه -->
+        <!-- اطلاعات فنی -->
+        <div class="technical-info">
+            <h3>🔧 اطلاعات فنی سیستم</h3>
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <span class="tech-label">آخرین بروزرسانی:</span>
+                    <span class="tech-value" id="lastUpdate">-</span>
+                </div>
+                <div class="tech-item">
+                    <span class="tech-label">میزان دیتای ارسالی:</span>
+                    <span class="tech-value" id="dataUsage">-</span>
+                </div>
+                <div class="tech-item">
+                    <span class="tech-label">مدت زمان فعالیت:</span>
+                    <span class="tech-value" id="uptime">-</span>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- اسکریپت نقشه بدون نیاز به API Key -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="script.js"></script>
-    <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_KEY&callback=initMap&language=fa">
-    </script>
 </body>
 </html>
