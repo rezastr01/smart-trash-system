@@ -1,165 +1,306 @@
-// تنظیمات Thingspeak - با Channel ID جدیدت
+// تنظیمات Thingspeak
 const THINGSPEAK_API_KEY = 'FOB57VQ57OC6VAP8';
-const THINGSPEAK_CHANNEL_ID = '3116788'; // 🔥 اینجا رو عوض کردم
-const UPDATE_INTERVAL = 5000;
+const THINGSPEAK_CHANNEL_ID = '3116788';
+const UPDATE_INTERVAL = 10000; // 10 ثانیه
 
-// موقعیت سطل
-const trashLocation = {
-    lat: 46.268571,
-    lng: 38.043959,
-    name: 'دانشگاه مهارت ملی'
-};
+// اطلاعات سطل‌ها (می‌تونی بعداً اضافه کنی)
+const trashCans = [
+    {
+        id: 1,
+        name: 'سطل دانشگاه مهارت ملی',
+        location: { lat: 46.268571, lng: 38.043959 },
+        type: 'main',
+        lastUpdate: null,
+        status: 'unknown'
+    }
+];
 
 let map;
-let marker;
+let markers = [];
+let lastDataTime = null;
+let isOnline = false;
 
+// ایجاد نقشه
 function initMap() {
-    map = new google.maps.Map(document.getElementById('map'), {
-        zoom: 15,
-        center: trashLocation,
-        mapTypeControl: false,
-        streetViewControl: false
-    });
+    map = L.map('map').setView([46.268571, 38.043959], 13);
+    
+    // اضافه کردن لایه نقشه (رایگان - بدون API Key)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18
+    }).addTo(map);
+    
+    // ایجاد مارکر برای سطل‌ها
+    createTrashMarkers();
+}
 
-    marker = new google.maps.Marker({
-        position: trashLocation,
-        map: map,
-        title: trashLocation.name,
-        icon: {
-            url: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHZpZXdCb3g9IjAgMCAzMCAzMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE1IDI4LjVMMTUgMjguNUMyMy4wMDg1IDI4LjUgMjkuNSAyMi4wMDg1IDI5LjUgMTQuNUMyOS41IDcuMDA4NSAyMy4wMDg1IDAuNSAxNSAwLjVDNy4wMDg1IDAuNSAwLjUgNy4wMDg1IDAuNSAxNC41QzAuNSAyMi4wMDg1IDcuMDA4NSAyOC41IDE1IDI4LjVaIiBmaWxsPSIjMjc4RUM2Ii8+CjxwYXRoIGQ9Ik0xNSAyN0MxNSAyNyAyMi41IDE4LjUgMjIuNSAxMi41QzIyLjUgOC4wMDAwMSAxOSA0LjUgMTUgNC41QzExIDQuNSA3LjUgOC4wMDAwMSA3LjUgMTIuNUM3LjUgMTguNSAxNSAyNyAxNSAyN1oiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=',
-            scaledSize: new google.maps.Size(30, 30)
-        }
-    });
-
-    const infowindow = new google.maps.InfoWindow({
-        content: `
-            <div style="padding: 10px;">
-                <h3 style="margin: 0 0 10px 0; color: #2c3e50;">🚮 سطل زباله هوشمند</h3>
-                <p style="margin: 0; color: #7f8c8d;">${trashLocation.name}</p>
+// ایجاد مارکرهای سطل‌ها
+function createTrashMarkers() {
+    trashCans.forEach(trash => {
+        const marker = L.marker(trash.location, {
+            icon: getTrashIcon('unknown')
+        }).addTo(map);
+        
+        markers.push({
+            id: trash.id,
+            marker: marker,
+            trash: trash
+        });
+        
+        // اضافه کردن پاپ‌آپ
+        marker.bindPopup(`
+            <div style="padding: 10px; min-width: 200px;">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🗑️ ${trash.name}</h4>
+                <div style="color: #7f8c8d; font-size: 12px;">
+                    <div>وضعیت: <span id="popup-status-${trash.id}">درحال بارگذاری...</span></div>
+                    <div>آخرین بروزرسانی: <span id="popup-time-${trash.id}">-</span></div>
+                </div>
             </div>
-        `
+        `);
     });
+}
 
-    marker.addListener('click', () => {
-        infowindow.open(map, marker);
+// آیکون سطل بر اساس وضعیت
+function getTrashIcon(status) {
+    let iconColor;
+    
+    switch(status) {
+        case 'empty':
+            iconColor = 'green';
+            break;
+        case 'half':
+            iconColor = 'orange';
+            break;
+        case 'full':
+            iconColor = 'red';
+            break;
+        case 'offline':
+            iconColor = 'gray';
+            break;
+        default:
+            iconColor = 'blue';
+    }
+    
+    return L.divIcon({
+        className: `trash-marker ${status}`,
+        html: `<div style="
+            background-color: ${iconColor}; 
+            width: 25px; 
+            height: 25px; 
+            border-radius: 50%; 
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        ">🗑️</div>`,
+        iconSize: [25, 25],
+        iconAnchor: [12, 12]
     });
 }
 
 // دریافت داده از Thingspeak
 async function fetchData() {
     try {
-        const response = await fetch(`https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/feeds/last.json?api_key=${THINGSPEAK_API_KEY}`);
+        const response = await fetch(`https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/feeds/last.json?api_key=${THINGSPEAK_API_KEY}&timezone=Asia/Tehran`);
         const data = await response.json();
         
-        console.log('📊 داده دریافتی از Thingspeak:', data);
+        console.log('📊 داده دریافتی:', data);
         
         if (data && data.field1) {
-            updateDashboard(data);
+            lastDataTime = new Date(data.created_at);
+            isOnline = true;
+            updateAllDisplays(data);
         } else {
             throw new Error('داده‌ای دریافت نشد');
         }
     } catch (error) {
-        console.error('خطا در دریافت داده:', error);
-        document.getElementById('connectionStatus').textContent = '🔴 قطع';
-        document.getElementById('connectionStatus').style.color = '#e74c3c';
-        
-        // بعد از 3 ثانیه دوباره تلاش کن
-        setTimeout(fetchData, 3000);
+        console.error('❌ خطا در دریافت داده:', error);
+        isOnline = false;
+        updateOfflineStatus();
     }
 }
 
-// آپدیت دشبورد
-function updateDashboard(data) {
+// آپدیت تمام نمایش‌ها
+function updateAllDisplays(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
     const latitude = parseFloat(data.field3);
     const longitude = parseFloat(data.field4);
     const isFull = parseInt(data.field5) === 1;
     
-    // آپدیت نوار پیشرفت
-    document.getElementById('progressFill').style.width = `${fillPercentage}%`;
-    document.getElementById('fillPercentage').textContent = `${fillPercentage}%`;
-    
-    // آپدیت وضعیت
-    const statusCard = document.getElementById('statusCard');
-    const statusText = document.getElementById('statusText');
-    const percentageText = document.getElementById('percentageText');
-    
-    percentageText.textContent = `${fillPercentage}%`;
-    
-    if (fillPercentage >= 80 || isFull) {
-        statusText.textContent = 'پر 🚨';
-        statusText.className = 'status status-full';
-        statusCard.style.background = 'linear-gradient(135deg, #ff6b6b, #ee5a24)';
-        statusCard.style.color = 'white';
+    // تشخیص وضعیت
+    let status;
+    if (!isOnline) {
+        status = 'offline';
+    } else if (fillPercentage >= 80 || isFull) {
+        status = 'full';
     } else if (fillPercentage >= 50) {
-        statusText.textContent = 'نیمه پر ⚠️';
-        statusText.className = 'status status-half';
-        statusCard.style.background = 'linear-gradient(135deg, #feca57, #ff9ff3)';
+        status = 'half';
     } else {
-        statusText.textContent = 'خالی ✅';
-        statusText.className = 'status status-empty';
-        statusCard.style.background = 'linear-gradient(135deg, #48dbfb, #0abde3)';
-        statusCard.style.color = 'white';
+        status = 'empty';
     }
     
-    // آپدیت اطلاعات لحظه‌ای
-    document.getElementById('distanceText').textContent = `${distance} سانتی‌متر`;
-    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('fa-IR');
-    document.getElementById('connectionStatus').textContent = '🟢 متصل';
-    document.getElementById('connectionStatus').style.color = '#27ae60';
+    // آپدیت مارکرها
+    updateMarkers(status, fillPercentage, distance);
     
-    // آپدیت موقعیت اگر داده جدید داریم
-    if (latitude && longitude && latitude !== 0 && longitude !== 0) {
-        updateMapLocation(latitude, longitude);
-    }
+    // آپدیت لیست سطل‌ها
+    updateTrashList(status, fillPercentage, distance);
     
-    // اضافه کردن به تاریخچه
-    addToHistory(fillPercentage, distance);
+    // آپدیت کارت‌های overview
+    updateOverviewCards(status);
+    
+    // آپدیت اطلاعات فنی
+    updateTechnicalInfo(data);
 }
 
-// آپدیت موقعیت روی نقشه
-function updateMapLocation(lat, lng) {
-    if (map && marker) {
-        const newLocation = { lat: lat, lng: lng };
-        map.setCenter(newLocation);
-        marker.setPosition(newLocation);
+// آپدیت وضعیت آفلاین
+function updateOfflineStatus() {
+    updateMarkers('offline', 0, 0);
+    updateTrashList('offline', 0, 0);
+    updateOverviewCards('offline');
+    updateTechnicalInfo(null);
+}
+
+// آپدیت مارکرها
+function updateMarkers(status, percentage, distance) {
+    markers.forEach(markerData => {
+        const newIcon = getTrashIcon(status);
+        markerData.marker.setIcon(newIcon);
         
-        // آپدیت اطلاعات موقعیت در صفحه
-        document.getElementById('coordinatesText').textContent = 
-            `مختصات: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        // آپدیت پاپ‌آپ
+        const statusText = getStatusText(status);
+        const timeText = isOnline ? new Date().toLocaleTimeString('fa-IR') : 'آفلاین';
+        
+        markerData.marker.setPopupContent(`
+            <div style="padding: 10px; min-width: 200px;">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🗑️ ${markerData.trash.name}</h4>
+                <div style="color: #7f8c8d; font-size: 12px;">
+                    <div>وضعیت: <strong style="color: ${getStatusColor(status)}">${statusText}</strong></div>
+                    <div>میزان پر: <strong>${percentage}%</strong></div>
+                    <div>فاصله: <strong>${distance}cm</strong></div>
+                    <div>آخرین بروزرسانی: <strong>${timeText}</strong></div>
+                </div>
+            </div>
+        `);
+    });
+}
+
+// آپدیت لیست سطل‌ها
+function updateTrashList(status, percentage, distance) {
+    const trashList = document.getElementById('trashList');
+    trashList.innerHTML = '';
+    
+    markers.forEach(markerData => {
+        const statusText = getStatusText(status);
+        const statusClass = getStatusClass(status);
+        
+        const trashItem = document.createElement('div');
+        trashItem.className = `trash-item ${status}`;
+        trashItem.innerHTML = `
+            <div class="trash-header">
+                <div class="trash-name">${markerData.trash.name}</div>
+                <div class="trash-status ${statusClass}">${statusText}</div>
+            </div>
+            <div class="trash-details">
+                <div class="detail-item">
+                    <span class="detail-label">میزان پر:</span>
+                    <span class="detail-value">${percentage}%</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">فاصله:</span>
+                    <span class="detail-value">${distance}cm</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">موقعیت:</span>
+                    <span class="detail-value">${markerData.trash.location.lat.toFixed(4)}, ${markerData.trash.location.lng.toFixed(4)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">وضعیت:</span>
+                    <span class="detail-value">${isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</span>
+                </div>
+            </div>
+        `;
+        
+        trashList.appendChild(trashItem);
+    });
+}
+
+// آپدیت کارت‌های overview
+function updateOverviewCards(status) {
+    document.getElementById('onlineStatus').textContent = isOnline ? '🟢 آنلاین' : '🔴 آفلاین';
+    document.getElementById('onlineStatus').style.color = isOnline ? '#27ae60' : '#e74c3c';
+    
+    if (isOnline) {
+        if (status === 'full') {
+            document.getElementById('emptyTrashCans').textContent = '0';
+            document.getElementById('fullTrashCans').textContent = '1';
+        } else {
+            document.getElementById('emptyTrashCans').textContent = '1';
+            document.getElementById('fullTrashCans').textContent = '0';
+        }
+    } else {
+        document.getElementById('emptyTrashCans').textContent = '0';
+        document.getElementById('fullTrashCans').textContent = '0';
     }
 }
 
-// اضافه کردن به تاریخچه
-function addToHistory(percentage, distance) {
-    const historyList = document.getElementById('historyList');
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('fa-IR');
+// آپدیت اطلاعات فنی
+function updateTechnicalInfo(data) {
+    document.getElementById('lastUpdate').textContent = isOnline ? 
+        new Date().toLocaleTimeString('fa-IR') : 'آفلاین';
     
-    const historyItem = document.createElement('div');
-    historyItem.className = 'history-item';
-    historyItem.innerHTML = `
-        <span>${timeString}</span>
-        <span>${percentage}% پر (${distance}cm)</span>
-    `;
+    document.getElementById('dataUsage').textContent = isOnline ? 
+        'فعال - دیتا درحال ارسال' : 'قطع ارتباط';
     
-    historyList.insertBefore(historyItem, historyList.firstChild);
-    
-    // محدود کردن تعداد آیتم‌های تاریخچه
-    if (historyList.children.length > 10) {
-        historyList.removeChild(historyList.lastChild);
+    // محاسبه مدت زمان فعالیت
+    updateUptime();
+}
+
+// تابع‌های کمکی
+function getStatusText(status) {
+    switch(status) {
+        case 'empty': return 'خالی';
+        case 'half': return 'نیمه پر';
+        case 'full': return 'پر';
+        case 'offline': return 'آفلاین';
+        default: return 'نامشخص';
     }
+}
+
+function getStatusClass(status) {
+    switch(status) {
+        case 'empty': return 'status-empty';
+        case 'half': return 'status-half';
+        case 'full': return 'status-full';
+        case 'offline': return 'status-offline';
+        default: return 'status-offline';
+    }
+}
+
+function getStatusColor(status) {
+    switch(status) {
+        case 'empty': return '#27ae60';
+        case 'half': return '#f39c12';
+        case 'full': return '#e74c3c';
+        case 'offline': return '#95a5a6';
+        default: return '#3498db';
+    }
+}
+
+function updateUptime() {
+    // می‌تونی اینجا منطق پیچیده‌تری برای محاسبه آپتایم اضافه کنی
+    document.getElementById('uptime').textContent = isOnline ? 'درحال فعالیت' : 'قطع شده';
 }
 
 // شروع برنامه
 document.addEventListener('DOMContentLoaded', function() {
-    // تنظیم موقعیت اولیه
-    document.getElementById('locationText').textContent = trashLocation.name;
-    document.getElementById('coordinatesText').textContent = 
-        `مختصات: ${trashLocation.lat.toFixed(6)}, ${trashLocation.lng.toFixed(6)}`;
-    
-    // شروع دریافت داده
+    initMap();
     fetchData();
     setInterval(fetchData, UPDATE_INTERVAL);
+    
+    // آپدیت هر 1 دقیقه برای اطلاعات فنی
+    setInterval(updateUptime, 60000);
 });
