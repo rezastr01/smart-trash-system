@@ -3,144 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سیستم مدیریت سطل‌های زباله هوشمند</title>
+    <title>سیستم مدیریت سطل‌های زباله هوشمند - دانشگاه مهارت ملی</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗑️</text></svg>">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🚮 سیستم مدیریت سطل‌های زباله هوشمند</h1>
-            <p>پایش لحظه‌ای سطل‌های زباله در سطح شهر - مدیریت هوشمند پسماند</p>
+        <!-- هدر -->
+        <header class="main-header">
+            <div class="header-content">
+                <h1>🚮 سیستم مدیریت سطل‌های زباله هوشمند</h1>
+                <p class="subtitle">پایش لحظه‌ای سطل‌های زباله - دانشگاه مهارت ملی</p>
+                <div class="university-info">
+                    <span class="university-badge">🎓 دانشگاه مهارت ملی</span>
+                    <span class="location-badge">📍 مختصات: 38.043959, 46.268571</span>
+                </div>
+            </div>
         </header>
 
-        <!-- دشبورد کلی -->
-        <div class="overview-cards">
-            <div class="overview-card">
-                <div class="overview-icon">🗑️</div>
-                <div class="overview-info">
-                    <h3>تعداد سطل‌ها</h3>
-                    <div class="overview-value" id="totalTrashCans">3</div>
+        <!-- کارت‌های آمار کلی -->
+        <section class="stats-section">
+            <h2 class="section-title">📊 آمار کلی سیستم</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🗑️</div>
+                    <div class="stat-info">
+                        <h3>تعداد سطل‌ها</h3>
+                        <div class="stat-value" id="totalTrashCans">3</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🟢</div>
+                    <div class="stat-info">
+                        <h3>سطل‌های خالی</h3>
+                        <div class="stat-value" id="emptyTrashCans">2</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔴</div>
+                    <div class="stat-info">
+                        <h3>سطل‌های پر</h3>
+                        <div class="stat-value" id="fullTrashCans">1</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📡</div>
+                    <div class="stat-info">
+                        <h3>وضعیت آنلاین</h3>
+                        <div class="stat-value" id="onlineStatus">آنلاین</div>
+                    </div>
                 </div>
             </div>
-            <div class="overview-card">
-                <div class="overview-icon">🟢</div>
-                <div class="overview-info">
-                    <h3>سطل‌های خالی</h3>
-                    <div class="overview-value" id="emptyTrashCans">2</div>
-                </div>
-            </div>
-            <div class="overview-card">
-                <div class="overview-icon">🔴</div>
-                <div class="overview-info">
-                    <h3>سطل‌های پر</h3>
-                    <div class="overview-value" id="fullTrashCans">1</div>
-                </div>
-            </div>
-            <div class="overview-card">
-                <div class="overview-icon">📡</div>
-                <div class="overview-info">
-                    <h3>وضعیت آنلاین</h3>
-                    <div class="overview-value" id="onlineStatus">آنلاین</div>
-                </div>
-            </div>
-        </div>
+        </section>
 
-        <!-- نقشه اصلی -->
-        <div class="map-section">
-            <h3>🗺️ نقشه موقعیت سطل‌ها</h3>
+        <!-- نقشه و اطلاعات موقعیت -->
+        <section class="map-section">
+            <div class="section-header">
+                <h2 class="section-title">🗺️ نقشه موقعیت سطل‌ها</h2>
+                <div class="map-controls">
+                    <button class="control-btn" onclick="refreshData()">🔄 بروزرسانی</button>
+                    <button class="control-btn" onclick="toggleAutoRefresh()" id="autoRefreshBtn">⏰ بروزرسانی خودکار: فعال</button>
+                </div>
+            </div>
+            
             <div class="map-legend">
-                <div class="legend-item">
-                    <div class="legend-color green"></div>
-                    <span>سطل خالی</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color orange"></div>
-                    <span>سطل نیمه پر</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color red"></div>
-                    <span>سطل پر</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color gray"></div>
-                    <span>آفلاین</span>
+                <div class="legend-title">راهنمای رنگ‌ها:</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color green"></div>
+                        <span>سطل خالی (0-49%)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color orange"></div>
+                        <span>سطل نیمه پر (50-79%)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color red"></div>
+                        <span>سطل پر (80-100%)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color gray"></div>
+                        <span>آفلاین</span>
+                    </div>
                 </div>
             </div>
-            <div id="map"></div>
-        </div>
 
-        <!-- اطلاعات سطل فعلی -->
-        <div class="current-trash-section">
-            <h3>📊 اطلاعات سطل فعال</h3>
+            <div id="map"></div>
+        </section>
+
+        <!-- اطلاعات سطل فعال -->
+        <section class="current-trash-section">
+            <h2 class="section-title">📈 اطلاعات سطل فعال</h2>
             <div class="current-trash-card">
                 <div class="trash-visual">
-                    <div class="trash-icon">🗑️</div>
+                    <div class="trash-icon-large">🗑️</div>
                     <div class="fill-indicator">
+                        <div class="fill-labels">
+                            <span>خالی</span>
+                            <span class="fill-percentage" id="fillPercentage">0%</span>
+                            <span>پر</span>
+                        </div>
                         <div class="fill-bar">
                             <div class="fill-level" id="fillLevel"></div>
                         </div>
-                        <div class="fill-percentage" id="fillPercentage">0%</div>
                     </div>
                 </div>
                 <div class="trash-details">
-                    <div class="detail-row">
-                        <span class="detail-label">نام سطل:</span>
-                        <span class="detail-value" id="trashName">سطل دانشگاه مهارت ملی</span>
+                    <div class="detail-group">
+                        <h3>📋 اطلاعات سطل</h3>
+                        <div class="detail-row">
+                            <span class="detail-label">نام سطل:</span>
+                            <span class="detail-value" id="trashName">سطل اصلی دانشگاه</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">کد سطل:</span>
+                            <span class="detail-value" id="trashId">1</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">وضعیت:</span>
+                            <span class="detail-value status-badge" id="statusBadge">خالی</span>
+                        </div>
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">وضعیت:</span>
-                        <span class="detail-value status-badge" id="statusBadge">خالی</span>
+                    
+                    <div class="detail-group">
+                        <h3>📊 اطلاعات فنی</h3>
+                        <div class="detail-row">
+                            <span class="detail-label">فاصله اندازه‌گیری:</span>
+                            <span class="detail-value" id="distanceValue">- cm</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">درصد پرشدگی:</span>
+                            <span class="detail-value" id="percentageValue">0%</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">مختصات جغرافیایی:</span>
+                            <span class="detail-value" id="coordinatesValue">38.043959, 46.268571</span>
+                        </div>
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">فاصله اندازه‌گیری:</span>
-                        <span class="detail-value" id="distanceValue">- cm</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">مختصات:</span>
-                        <span class="detail-value" id="coordinatesValue">46.268571, 38.043959</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">آخرین بروزرسانی:</span>
-                        <span class="detail-value" id="lastUpdateValue">-</span>
+                    
+                    <div class="detail-group">
+                        <h3>🕒 اطلاعات زمانی</h3>
+                        <div class="detail-row">
+                            <span class="detail-label">آخرین بروزرسانی:</span>
+                            <span class="detail-value" id="lastUpdateValue">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">بازه بروزرسانی:</span>
+                            <span class="detail-value">10 ثانیه</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- لیست سطل‌ها -->
-        <div class="trash-list-section">
-            <h3>📋 لیست سطل‌ها</h3>
+        <!-- لیست تمام سطل‌ها -->
+        <section class="trash-list-section">
+            <h2 class="section-title">📋 لیست تمام سطل‌ها</h2>
             <div class="trash-list" id="trashList">
                 <!-- سطل‌ها به صورت داینامیک اضافه می‌شوند -->
             </div>
-        </div>
+        </section>
 
-        <!-- اطلاعات فنی -->
-        <div class="technical-info">
-            <h3>🔧 اطلاعات فنی سیستم</h3>
+        <!-- اطلاعات فنی سیستم -->
+        <section class="technical-info">
+            <h2 class="section-title">🔧 اطلاعات فنی سیستم</h2>
             <div class="tech-grid">
-                <div class="tech-item">
-                    <span class="tech-label">کانال Thingspeak:</span>
-                    <span class="tech-value">3116788</span>
+                <div class="tech-card">
+                    <h3>🌐 ارتباطات</h3>
+                    <div class="tech-item">
+                        <span class="tech-label">کانال Thingspeak:</span>
+                        <span class="tech-value">3116788</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-label">وضعیت ارتباط:</span>
+                        <span class="tech-value" id="connectionStatus">متصل</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-label">میزان دیتای ارسالی:</span>
+                        <span class="tech-value" id="dataUsage">فعال</span>
+                    </div>
                 </div>
-                <div class="tech-item">
-                    <span class="tech-label">میزان دیتای ارسالی:</span>
-                    <span class="tech-value" id="dataUsage">فعال</span>
+                
+                <div class="tech-card">
+                    <h3>⏱️ زمان‌بندی</h3>
+                    <div class="tech-item">
+                        <span class="tech-label">مدت زمان فعالیت:</span>
+                        <span class="tech-value" id="uptime">-</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-label">تعداد بروزرسانی:</span>
+                        <span class="tech-value" id="updateCount">0</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-label">بازه بروزرسانی:</span>
+                        <span class="tech-value">10 ثانیه</span>
+                    </div>
                 </div>
-                <div class="tech-item">
-                    <span class="tech-label">مدت زمان فعالیت:</span>
-                    <span class="tech-value" id="uptime">-</span>
-                </div>
-                <div class="tech-item">
-                    <span class="tech-label">ورژن سیستم:</span>
-                    <span class="tech-value">v2.0</span>
+                
+                <div class="tech-card">
+                    <h3>⚙️ مشخصات فنی</h3>
+                    <div class="tech-item">
+                        <span class="tech-label">ورژن سیستم:</span>
+                        <span class="tech-value">v2.1</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-label">پلتفرم:</span>
+                        <span class="tech-value">ESP32 + IoT</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-label">سنسور:</span>
+                        <span class="tech-value">اولتراسونیک HC-SR04</span>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <!-- فوتر -->
+        <footer class="main-footer">
+            <div class="footer-content">
+                <p>🚮 سیستم مدیریت سطل‌های زباله هوشمند - دانشگاه مهارت ملی</p>
+                <p>📧 توسعه داده شده با ESP32 و تکنولوژی IoT</p>
+                <div class="footer-links">
+                    <span>کانال Thingspeak: 3116788</span>
+                    <span>مختصات: 38.043959, 46.268571</span>
+                </div>
+            </div>
+        </footer>
     </div>
 
+    <!-- اسکریپت‌ها -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
