@@ -38,6 +38,7 @@ let map;
 let markers = [];
 let isOnline = false;
 let updateCount = 0;
+let lastSuccessfulUpdate = null;
 
 // ایجاد نقشه
 function initMap() {
@@ -142,6 +143,10 @@ function updateMarkerPopup(marker, trash) {
                     <span style="color: #7f8c8d;">بروزرسانی:</span>
                     <strong>${timeText}</strong>
                 </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7f8c8d;">وضعیت سیستم:</span>
+                    <strong>${isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</strong>
+                </div>
             </div>
         </div>
     `;
@@ -165,10 +170,12 @@ async function fetchData() {
         const data = await response.json();
         console.log('📊 داده دریافتی:', data);
         
-        if (data && data.field1) {
+        if (data && data.field1 && data.field1 !== '0') {
             isOnline = true;
             updateCount++;
-            processThingSpeakData(data);
+            lastSuccessfulUpdate = Date.now();
+            await processThingSpeakData(data);
+            console.log('✅ داده با موفقیت پردازش شد');
         } else {
             throw new Error('داده معتبر دریافت نشد');
         }
@@ -176,7 +183,7 @@ async function fetchData() {
     } catch (error) {
         console.error('❌ خطا در دریافت داده:', error);
         isOnline = false;
-        updateOfflineStatus();
+        checkSystemOnline(); // بررسی وضعیت آفلاین
     }
 }
 
@@ -188,6 +195,7 @@ function processThingSpeakData(data) {
     const longitude = parseFloat(data.field4);
     const isFull = parseInt(data.field5) === 1;
     const trashId = parseInt(data.field6) || 1;
+    const systemTime = parseInt(data.field7) || Date.now();
     
     // تشخیص وضعیت سطل
     let status;
@@ -223,12 +231,42 @@ function updateTrashCan(id, status, fillPercentage, distance, lat, lng) {
     }
 }
 
-// آپدیت وضعیت آفلاین
-function updateOfflineStatus() {
+// بررسی آنلاین بودن سیستم
+function checkSystemOnline() {
+    const now = Date.now();
+    
+    // اگر هیچ داده موفقی دریافت نشده
+    if (!lastSuccessfulUpdate) {
+        setSystemOffline();
+        return;
+    }
+    
+    // اگر بیش از 30 ثانیه از آخرین بروزرسانی موفق گذشته
+    const timeSinceLastUpdate = now - lastSuccessfulUpdate;
+    if (timeSinceLastUpdate > 30000) {
+        setSystemOffline();
+        console.log('🚨 سیستم آفلاین تشخیص داده شد');
+    } else {
+        isOnline = true;
+        console.log('✅ سیستم آنلاین است');
+    }
+}
+
+// تنظیم وضعیت آفلاین سیستم
+function setSystemOffline() {
+    isOnline = false;
+    
+    // آپدیت وضعیت همه سطل‌ها به آفلاین
     trashCans.forEach(trash => {
         trash.status = 'unknown';
+        trash.fill = 0;
+        trash.distance = 0;
     });
+    
+    // آپدیت نمایش
     updateAllDisplays(1);
+    
+    console.log('🔴 سیستم در حالت آفلاین');
 }
 
 // آپدیت تمام نمایش‌ها
@@ -323,8 +361,11 @@ function updateCurrentTrashDisplay(trashId) {
     // آپدیت اطلاعات اصلی
     document.getElementById('trashName').textContent = trash.name;
     document.getElementById('gaugeText').textContent = trash.fill + '%';
-    document.getElementById('gaugeFill').style.height = trash.fill + '%';
-    document.getElementById('gaugeFill').style.backgroundColor = getStatusColor(trash.status);
+    
+    const gaugeFill = document.getElementById('gaugeFill');
+    gaugeFill.style.height = trash.fill + '%';
+    gaugeFill.style.backgroundColor = getStatusColor(trash.status);
+    
     document.getElementById('trashDistance').textContent = trash.distance + ' cm';
     document.getElementById('trashStatus').textContent = getStatusText(trash.status);
     document.getElementById('lastUpdate').textContent = 
@@ -339,8 +380,21 @@ function updateCurrentTrashDisplay(trashId) {
 // آپدیت وضعیت ارتباط
 function updateConnectionStatus() {
     const statusElement = document.getElementById('connectionStatus');
-    statusElement.textContent = isOnline ? 'آنلاین' : 'آفلاین';
-    statusElement.style.color = isOnline ? '#27ae60' : '#e74c3c';
+    
+    if (isOnline) {
+        statusElement.textContent = 'آنلاین';
+        statusElement.style.color = '#27ae60';
+    } else {
+        statusElement.textContent = 'آفلاین';
+        statusElement.style.color = '#e74c3c';
+        
+        // آپدیت اطلاعات سطل فعلی برای حالت آفلاین
+        document.getElementById('gaugeText').textContent = '0%';
+        document.getElementById('gaugeFill').style.height = '0%';
+        document.getElementById('trashDistance').textContent = '- cm';
+        document.getElementById('trashStatus').textContent = 'آفلاین';
+        document.getElementById('lastUpdate').textContent = 'آفلاین';
+    }
 }
 
 // توابع کمکی
@@ -349,7 +403,7 @@ function getStatusText(status) {
         case 'empty': return 'خالی';
         case 'half': return 'نیمه پر';
         case 'full': return 'پر';
-        case 'unknown': return 'نامشخص';
+        case 'unknown': return 'آفلاین';
         default: return 'نامشخص';
     }
 }
@@ -370,6 +424,32 @@ function refreshData() {
     fetchData();
 }
 
+// تابع بروزرسانی خودکار
+function toggleAutoRefresh() {
+    const btn = document.getElementById('autoRefreshBtn');
+    if (btn.textContent.includes('فعال')) {
+        clearInterval(window.autoRefreshInterval);
+        btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
+        btn.style.background = '#e74c3c';
+        console.log('⏸️ بروزرسانی خودکار غیرفعال شد');
+    } else {
+        startAutoRefresh();
+        btn.textContent = '⏰ بروزرسانی خودکار: فعال';
+        btn.style.background = '#27ae60';
+        console.log('▶️ بروزرسانی خودکار فعال شد');
+    }
+}
+
+function startAutoRefresh() {
+    // توقف interval قبلی
+    if (window.autoRefreshInterval) {
+        clearInterval(window.autoRefreshInterval);
+    }
+    
+    // شروع interval جدید
+    window.autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
+}
+
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
@@ -379,10 +459,21 @@ document.addEventListener('DOMContentLoaded', function() {
     updateAllDisplays();
     
     // شروع بروزرسانی خودکار
-    setInterval(fetchData, UPDATE_TIME);
+    startAutoRefresh();
+    
+    // شروع چک کردن وضعیت آنلاین
+    setInterval(checkSystemOnline, 5000);
     
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
     
     console.log('✅ سیستم وب آماده به کار است');
+});
+
+// مدیریت رویدادهای صفحه
+window.addEventListener('beforeunload', function() {
+    if (window.autoRefreshInterval) {
+        clearInterval(window.autoRefreshInterval);
+    }
+    console.log('🛑 توقف سیستم...');
 });
