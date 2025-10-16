@@ -1,94 +1,66 @@
 // تنظیمات سیستم
-const CONFIG = {
-    THINGSPEAK_CHANNEL_ID: '3116788',
-    THINGSPEAK_API_KEY: 'FOB57VQ57OC6VAP8',
-    UPDATE_INTERVAL: 10000, // 10 ثانیه
-    AUTO_REFRESH: true
-};
+const CHANNEL_ID = '3116788';
+const API_KEY = 'FOB57VQ57OC6VAP8';
+const UPDATE_TIME = 10000; // 10 ثانیه
 
 // اطلاعات سطل‌های دانشگاه مهارت ملی
 const trashCans = [
     {
         id: 1,
         name: 'سطل اصلی دانشگاه',
-        location: { lat: 38.043959, lng: 46.268571 },
-        description: 'سطل اصلی واقع در محوطه مرکزی دانشگاه',
+        location: [38.043972, 46.268583],
         status: 'unknown',
-        fillPercentage: 0,
+        fill: 0,
         distance: 0,
-        lastUpdate: null,
-        isOnline: false
+        lastUpdate: null
     },
     {
         id: 2,
         name: 'سطل محوطه مرکزی',
-        location: { lat: 38.044500, lng: 46.269000 },
-        description: 'سطل واقع در محوطه مرکزی دانشگاه',
+        location: [38.044300, 46.268900],
         status: 'unknown',
-        fillPercentage: 0,
+        fill: 0,
         distance: 0,
-        lastUpdate: null,
-        isOnline: false
+        lastUpdate: null
     },
     {
         id: 3,
         name: 'سطل ورودی شرقی',
-        location: { lat: 38.042800, lng: 46.267800 },
-        description: 'سطل واقع در ورودی شرقی دانشگاه',
+        location: [38.043600, 46.268200],
         status: 'unknown',
-        fillPercentage: 0,
+        fill: 0,
         distance: 0,
-        lastUpdate: null,
-        isOnline: false
+        lastUpdate: null
     }
 ];
 
-// متغیرهای سیستم
 let map;
 let markers = [];
 let isOnline = false;
 let updateCount = 0;
-let autoRefreshInterval;
-let lastSuccessfulUpdate = null;
 
-// وضعیت‌های سیستم
-const STATUS = {
-    EMPTY: { text: 'خالی', color: '#27ae60', class: 'empty' },
-    HALF: { text: 'نیمه پر', color: '#f39c12', class: 'half' },
-    FULL: { text: 'پر', color: '#e74c3c', class: 'full' },
-    OFFLINE: { text: 'آفلاین', color: '#95a5a6', class: 'offline' },
-    UNKNOWN: { text: 'نامشخص', color: '#3498db', class: 'unknown' }
-};
-
-// راه‌اندازی نقشه
+// ایجاد نقشه
 function initMap() {
-    try {
-        // ایجاد نقشه با مرکز دانشگاه مهارت ملی
-        map = L.map('map').setView([38.043959, 46.268571], 16);
-        
-        // اضافه کردن لایه نقشه OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 18
-        }).addTo(map);
-        
-        // ایجاد مارکر برای سطل‌ها
-        createTrashMarkers();
-        
-        console.log('🗺️ نقشه با موفقیت ایجاد شد');
-        showNotification('نقشه با موفقیت بارگذاری شد', 'success');
-        
-    } catch (error) {
-        console.error('❌ خطا در ایجاد نقشه:', error);
-        showNotification('خطا در بارگذاری نقشه', 'error');
-    }
+    // ایجاد نقشه با مرکز دانشگاه مهارت ملی
+    map = L.map('map').setView([38.043972, 46.268583], 16);
+    
+    // اضافه کردن لایه نقشه OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 18
+    }).addTo(map);
+    
+    // ایجاد مارکر برای سطل‌ها
+    createMarkers();
+    
+    console.log('🗺️ نقشه با موفقیت ایجاد شد');
 }
 
 // ایجاد مارکرهای سطل‌ها
-function createTrashMarkers() {
+function createMarkers() {
     trashCans.forEach(trash => {
         const marker = L.marker(trash.location, {
-            icon: createTrashIcon(trash.status)
+            icon: getTrashIcon(trash.status)
         }).addTo(map);
         
         markers.push({
@@ -97,7 +69,7 @@ function createTrashMarkers() {
             trash: trash
         });
         
-        // آپدیت پاپ‌آپ
+        // آپدیت پاپ‌آپ مارکر
         updateMarkerPopup(marker, trash);
         
         // اضافه کردن event برای کلیک روی مارکر
@@ -108,83 +80,73 @@ function createTrashMarkers() {
 }
 
 // ایجاد آیکون سفارشی برای سطل‌ها
-function createTrashIcon(status) {
-    const statusConfig = STATUS[status.toUpperCase()] || STATUS.UNKNOWN;
+function getTrashIcon(status) {
+    let color;
+    switch(status) {
+        case 'empty': color = '#27ae60'; break;
+        case 'half': color = '#f39c12'; break;
+        case 'full': color = '#e74c3c'; break;
+        default: color = '#95a5a6';
+    }
     
     return L.divIcon({
-        className: `trash-marker ${statusConfig.class}`,
+        className: 'custom-trash-icon',
         html: `
             <div style="
-                background: ${statusConfig.color};
-                width: 45px;
-                height: 45px;
+                background: ${color};
+                width: 40px;
+                height: 40px;
                 border-radius: 50%;
                 border: 3px solid white;
-                box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
-                font-size: 20px;
-                font-weight: bold;
+                font-size: 18px;
                 cursor: pointer;
-                transition: all 0.3s ease;
-            " 
-            onmouseover="this.style.transform='scale(1.1)'" 
-            onmouseout="this.style.transform='scale(1)'"
-            title="${statusConfig.text}">
-                🗑️
-            </div>
+            ">🗑️</div>
         `,
-        iconSize: [45, 45],
-        iconAnchor: [22, 22]
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
     });
 }
 
 // آپدیت پاپ‌آپ مارکر
 function updateMarkerPopup(marker, trash) {
-    const statusConfig = STATUS[trash.status.toUpperCase()] || STATUS.UNKNOWN;
+    const statusText = getStatusText(trash.status);
     const timeText = trash.lastUpdate ? 
-        formatTime(trash.lastUpdate) : 'آفلاین';
+        trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
     
     const popupContent = `
-        <div class="popup-content">
-            <div class="popup-header">
-                <h3>🗑️ ${trash.name}</h3>
-                <span class="status-badge" style="background: ${statusConfig.color}">
-                    ${statusConfig.text}
-                </span>
-            </div>
-            <div class="popup-details">
-                <div class="popup-row">
-                    <span class="popup-label">میزان پر:</span>
-                    <span class="popup-value">${trash.fillPercentage}%</span>
+        <div style="padding: 12px; min-width: 220px; font-family: Vazir, sans-serif;">
+            <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🗑️ ${trash.name}</h4>
+            <div style="display: grid; gap: 6px; font-size: 13px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7f8c8d;">وضعیت:</span>
+                    <strong style="color: ${getStatusColor(trash.status)}">${statusText}</strong>
                 </div>
-                <div class="popup-row">
-                    <span class="popup-label">فاصله:</span>
-                    <span class="popup-value">${trash.distance} سانتی‌متر</span>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7f8c8d;">میزان پر:</span>
+                    <strong>${trash.fill}%</strong>
                 </div>
-                <div class="popup-row">
-                    <span class="popup-label">موقعیت:</span>
-                    <span class="popup-value coordinates">${trash.location.lat.toFixed(6)}, ${trash.location.lng.toFixed(6)}</span>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7f8c8d;">فاصله:</span>
+                    <strong>${trash.distance}cm</strong>
                 </div>
-                <div class="popup-row">
-                    <span class="popup-label">بروزرسانی:</span>
-                    <span class="popup-value">${timeText}</span>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7f8c8d;">موقعیت:</span>
+                    <strong>${trash.location[0].toFixed(6)}, ${trash.location[1].toFixed(6)}</strong>
                 </div>
-                <div class="popup-row">
-                    <span class="popup-label">وضعیت:</span>
-                    <span class="popup-value">${trash.isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</span>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #7f8c8d;">بروزرسانی:</span>
+                    <strong>${timeText}</strong>
                 </div>
             </div>
-            ${trash.description ? `<div class="popup-description">${trash.description}</div>` : ''}
         </div>
     `;
     
-    marker.bindPopup(popupContent, {
-        className: 'custom-popup',
-        maxWidth: 300
-    });
+    marker.bindPopup(popupContent);
 }
 
 // دریافت داده از Thingspeak
@@ -193,7 +155,7 @@ async function fetchData() {
         console.log('📡 درحال دریافت داده از Thingspeak...');
         
         const response = await fetch(
-            `https://api.thingspeak.com/channels/${CONFIG.THINGSPEAK_CHANNEL_ID}/feeds/last.json?api_key=${CONFIG.THINGSPEAK_API_KEY}`
+            `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}`
         );
         
         if (!response.ok) {
@@ -205,10 +167,8 @@ async function fetchData() {
         
         if (data && data.field1) {
             isOnline = true;
-            lastSuccessfulUpdate = new Date();
             updateCount++;
-            await processThingSpeakData(data);
-            showNotification('داده با موفقیت دریافت شد', 'success');
+            processThingSpeakData(data);
         } else {
             throw new Error('داده معتبر دریافت نشد');
         }
@@ -217,7 +177,6 @@ async function fetchData() {
         console.error('❌ خطا در دریافت داده:', error);
         isOnline = false;
         updateOfflineStatus();
-        showNotification('خطا در دریافت داده', 'error');
     }
 }
 
@@ -233,11 +192,11 @@ function processThingSpeakData(data) {
     // تشخیص وضعیت سطل
     let status;
     if (fillPercentage >= 80 || isFull) {
-        status = 'FULL';
+        status = 'full';
     } else if (fillPercentage >= 50) {
-        status = 'HALF';
+        status = 'half';
     } else {
-        status = 'EMPTY';
+        status = 'empty';
     }
     
     // آپدیت سطل مربوطه
@@ -251,16 +210,15 @@ function processThingSpeakData(data) {
 function updateTrashCan(id, status, fillPercentage, distance, lat, lng) {
     const trashIndex = trashCans.findIndex(trash => trash.id === id);
     if (trashIndex !== -1) {
-        trashCans[trashIndex].status = status.toLowerCase();
-        trashCans[trashIndex].fillPercentage = fillPercentage;
+        trashCans[trashIndex].status = status;
+        trashCans[trashIndex].fill = fillPercentage;
         trashCans[trashIndex].distance = distance;
         trashCans[trashIndex].lastUpdate = new Date();
-        trashCans[trashIndex].isOnline = true;
         
         // اگر مختصات جدید ارسال شده
         if (lat && lng) {
-            trashCans[trashIndex].location.lat = lat;
-            trashCans[trashIndex].location.lng = lng;
+            trashCans[trashIndex].location[0] = lat;
+            trashCans[trashIndex].location[1] = lng;
         }
     }
 }
@@ -268,8 +226,7 @@ function updateTrashCan(id, status, fillPercentage, distance, lat, lng) {
 // آپدیت وضعیت آفلاین
 function updateOfflineStatus() {
     trashCans.forEach(trash => {
-        trash.status = 'offline';
-        trash.isOnline = false;
+        trash.status = 'unknown';
     });
     updateAllDisplays(1);
 }
@@ -280,14 +237,14 @@ function updateAllDisplays(activeTrashId = 1) {
     updateTrashList();
     updateOverviewCards();
     updateCurrentTrashDisplay(activeTrashId);
-    updateTechnicalInfo();
+    updateConnectionStatus();
 }
 
 // آپدیت مارکرها روی نقشه
 function updateMarkers() {
     markers.forEach(markerData => {
         const trash = markerData.trash;
-        const newIcon = createTrashIcon(trash.status);
+        const newIcon = getTrashIcon(trash.status);
         markerData.marker.setIcon(newIcon);
         
         // آپدیت موقعیت اگر تغییر کرده
@@ -304,45 +261,38 @@ function updateTrashList() {
     trashList.innerHTML = '';
     
     trashCans.forEach(trash => {
-        const statusConfig = STATUS[trash.status.toUpperCase()] || STATUS.UNKNOWN;
-        const timeText = trash.lastUpdate ? formatTime(trash.lastUpdate) : 'آفلاین';
+        const statusText = getStatusText(trash.status);
+        const statusClass = `state-${trash.status}`;
+        const timeText = trash.lastUpdate ? 
+            trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
         
         const trashItem = document.createElement('div');
         trashItem.className = `trash-item ${trash.status}`;
         trashItem.innerHTML = `
             <div class="trash-header">
-                <div class="trash-info">
-                    <div class="trash-name">${trash.name}</div>
-                    <div class="trash-description">${trash.description}</div>
-                </div>
-                <div class="trash-status ${statusConfig.class}" style="background: ${statusConfig.color}">
-                    ${statusConfig.text}
-                </div>
+                <div class="trash-title">${trash.name}</div>
+                <div class="trash-state ${statusClass}">${statusText}</div>
             </div>
             <div class="trash-details">
-                <div class="detail-item">
-                    <span class="detail-label">کد سطل:</span>
-                    <span class="detail-value">${trash.id}</span>
+                <div class="trash-detail">
+                    <span>میزان پر:</span>
+                    <span>${trash.fill}%</span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">میزان پر:</span>
-                    <span class="detail-value">${trash.fillPercentage}%</span>
+                <div class="trash-detail">
+                    <span>فاصله:</span>
+                    <span>${trash.distance}cm</span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">فاصله:</span>
-                    <span class="detail-value">${trash.distance}cm</span>
+                <div class="trash-detail">
+                    <span>کد سطل:</span>
+                    <span>${trash.id}</span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">موقعیت:</span>
-                    <span class="detail-value coordinates">${trash.location.lat.toFixed(4)}, ${trash.location.lng.toFixed(4)}</span>
+                <div class="trash-detail">
+                    <span>وضعیت:</span>
+                    <span>${isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</span>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">وضعیت:</span>
-                    <span class="detail-value">${trash.isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">آخرین بروزرسانی:</span>
-                    <span class="detail-value">${timeText}</span>
+                <div class="trash-detail">
+                    <span>آخرین بروزرسانی:</span>
+                    <span>${timeText}</span>
                 </div>
             </div>
         `;
@@ -356,123 +306,68 @@ function updateTrashList() {
     });
 }
 
-// آپدیت نمایش سطل فعلی
-function updateCurrentTrashDisplay(trashId) {
-    const trash = trashCans.find(t => t.id === trashId) || trashCans[0];
-    const statusConfig = STATUS[trash.status.toUpperCase()] || STATUS.UNKNOWN;
-    
-    // آپدیت اطلاعات اصلی
-    document.getElementById('trashName').textContent = trash.name;
-    document.getElementById('trashId').textContent = trash.id;
-    document.getElementById('fillPercentage').textContent = `${trash.fillPercentage}%`;
-    document.getElementById('percentageValue').textContent = `${trash.fillPercentage}%`;
-    
-    // آپدیت نوار پیشرفت
-    const fillLevel = document.getElementById('fillLevel');
-    fillLevel.style.width = `${trash.fillPercentage}%`;
-    fillLevel.style.backgroundColor = statusConfig.color;
-    
-    // آپدیت وضعیت
-    const statusBadge = document.getElementById('statusBadge');
-    statusBadge.textContent = statusConfig.text;
-    statusBadge.style.backgroundColor = statusConfig.color;
-    
-    // آپدیت سایر اطلاعات
-    document.getElementById('distanceValue').textContent = `${trash.distance} سانتی‌متر`;
-    document.getElementById('coordinatesValue').textContent = 
-        `${trash.location.lat.toFixed(6)}, ${trash.location.lng.toFixed(6)}`;
-    document.getElementById('lastUpdateValue').textContent = 
-        trash.lastUpdate ? formatTime(trash.lastUpdate) : 'آفلاین';
-    
-    // مرکز کردن نقشه روی سطل انتخاب شده
-    if (map) {
-        map.setView([trash.location.lat, trash.location.lng], 16);
-    }
-}
-
 // آپدیت کارت‌های آمار کلی
 function updateOverviewCards() {
-    document.getElementById('onlineStatus').textContent = isOnline ? '🟢 آنلاین' : '🔴 آفلاین';
-    document.getElementById('onlineStatus').style.color = isOnline ? '#27ae60' : '#e74c3c';
-    
     const emptyCount = trashCans.filter(trash => trash.status === 'empty').length;
     const fullCount = trashCans.filter(trash => trash.status === 'full').length;
     
-    document.getElementById('emptyTrashCans').textContent = emptyCount;
-    document.getElementById('fullTrashCans').textContent = fullCount;
-    document.getElementById('totalTrashCans').textContent = trashCans.length;
+    document.getElementById('emptyCans').textContent = emptyCount;
+    document.getElementById('fullCans').textContent = fullCount;
+    document.getElementById('totalCans').textContent = trashCans.length;
 }
 
-// آپدیت اطلاعات فنی
-function updateTechnicalInfo() {
-    document.getElementById('connectionStatus').textContent = isOnline ? 'متصل' : 'قطع';
-    document.getElementById('connectionStatus').style.color = isOnline ? '#27ae60' : '#e74c3c';
+// آپدیت نمایش سطل فعلی
+function updateCurrentTrashDisplay(trashId) {
+    const trash = trashCans.find(t => t.id === trashId) || trashCans[0];
     
-    document.getElementById('dataUsage').textContent = isOnline ? 
-        `${updateCount} درخواست موفق` : 'قطع ارتباط';
+    // آپدیت اطلاعات اصلی
+    document.getElementById('trashName').textContent = trash.name;
+    document.getElementById('gaugeText').textContent = trash.fill + '%';
+    document.getElementById('gaugeFill').style.height = trash.fill + '%';
+    document.getElementById('gaugeFill').style.backgroundColor = getStatusColor(trash.status);
+    document.getElementById('trashDistance').textContent = trash.distance + ' cm';
+    document.getElementById('trashStatus').textContent = getStatusText(trash.status);
+    document.getElementById('lastUpdate').textContent = 
+        trash.lastUpdate ? trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
     
-    document.getElementById('updateCount').textContent = updateCount;
-    
-    // محاسبه زمان فعالیت
-    const uptimeElement = document.getElementById('uptime');
-    if (lastSuccessfulUpdate) {
-        const uptime = Math.floor((new Date() - lastSuccessfulUpdate) / 1000);
-        uptimeElement.textContent = formatUptime(uptime);
-    } else {
-        uptimeElement.textContent = 'آفلاین';
+    // مرکز کردن نقشه روی سطل انتخاب شده
+    if (map) {
+        map.setView(trash.location, 16);
     }
 }
 
-// توابع utility
-function formatTime(date) {
-    return date.toLocaleTimeString('fa-IR');
+// آپدیت وضعیت ارتباط
+function updateConnectionStatus() {
+    const statusElement = document.getElementById('connectionStatus');
+    statusElement.textContent = isOnline ? 'آنلاین' : 'آفلاین';
+    statusElement.style.color = isOnline ? '#27ae60' : '#e74c3c';
 }
 
-function formatUptime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+// توابع کمکی
+function getStatusText(status) {
+    switch(status) {
+        case 'empty': return 'خالی';
+        case 'half': return 'نیمه پر';
+        case 'full': return 'پر';
+        case 'unknown': return 'نامشخص';
+        default: return 'نامشخص';
+    }
 }
 
-function showNotification(message, type = 'info') {
-    // ایجاد نوتیفیکیشن موقت در کنسول
-    console.log(`🔔 ${type.toUpperCase()}: ${message}`);
+function getStatusColor(status) {
+    switch(status) {
+        case 'empty': return '#27ae60';
+        case 'half': return '#f39c12';
+        case 'full': return '#e74c3c';
+        case 'unknown': return '#95a5a6';
+        default: return '#3498db';
+    }
 }
 
+// تابع بروزرسانی دستی
 function refreshData() {
     console.log('🔄 بروزرسانی دستی داده‌ها...');
-    showNotification('درحال بروزرسانی داده‌ها...', 'info');
     fetchData();
-}
-
-function toggleAutoRefresh() {
-    CONFIG.AUTO_REFRESH = !CONFIG.AUTO_REFRESH;
-    const btn = document.getElementById('autoRefreshBtn');
-    
-    if (CONFIG.AUTO_REFRESH) {
-        startAutoRefresh();
-        btn.textContent = '⏰ بروزرسانی خودکار: فعال';
-        btn.style.background = '#27ae60';
-        showNotification('بروزرسانی خودکار فعال شد', 'success');
-    } else {
-        stopAutoRefresh();
-        btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
-        btn.style.background = '#e74c3c';
-        showNotification('بروزرسانی خودکار غیرفعال شد', 'warning');
-    }
-}
-
-function startAutoRefresh() {
-    stopAutoRefresh(); // توقف interval قبلی
-    autoRefreshInterval = setInterval(fetchData, CONFIG.UPDATE_INTERVAL);
-}
-
-function stopAutoRefresh() {
-    if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-        autoRefreshInterval = null;
-    }
 }
 
 // راه‌اندازی سیستم
@@ -484,17 +379,10 @@ document.addEventListener('DOMContentLoaded', function() {
     updateAllDisplays();
     
     // شروع بروزرسانی خودکار
-    startAutoRefresh();
+    setInterval(fetchData, UPDATE_TIME);
     
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
     
     console.log('✅ سیستم وب آماده به کار است');
-    showNotification('سیستم با موفقیت راه‌اندازی شد', 'success');
-});
-
-// مدیریت رویدادهای صفحه
-window.addEventListener('beforeunload', function() {
-    stopAutoRefresh();
-    console.log('🛑 توقف سیستم...');
 });
