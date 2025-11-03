@@ -13,7 +13,7 @@ const trashCans = [
         fill: 0,
         distance: 0,
         lastUpdate: null,
-        isReal: true  // این سطل واقعیه
+        isReal: true
     },
     {
         id: 2,
@@ -23,7 +23,7 @@ const trashCans = [
         fill: 0,
         distance: 12,
         lastUpdate: null,
-        isReal: false  // این سطل فیکه
+        isReal: false
     },
     {
         id: 3,
@@ -33,7 +33,7 @@ const trashCans = [
         fill: 0,
         distance: 10,
         lastUpdate: null,
-        isReal: false  // این سطل فیکه
+        isReal: false
     }
 ];
 
@@ -42,7 +42,7 @@ let markers = [];
 let isOnline = false;
 let updateCount = 0;
 let lastSuccessfulUpdate = null;
-let autoRefreshEnabled = true; // وضعیت بروزرسانی خودکار
+let autoRefreshInterval = null;
 
 // ایجاد نقشه
 function initMap() {
@@ -430,35 +430,34 @@ function refreshData() {
     fetchData();
 }
 
-// تابع بروزرسانی خودکار - تصحیح شده
+// تابع بروزرسانی خودکار - کاملاً تصحیح شده
 function toggleAutoRefresh() {
     const btn = document.getElementById('autoRefreshBtn');
     
-    if (autoRefreshEnabled) {
+    if (autoRefreshInterval) {
         // غیرفعال کردن
-        clearInterval(window.autoRefreshInterval);
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
         btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
         btn.style.background = '#e74c3c';
-        autoRefreshEnabled = false;
         console.log('⏸️ بروزرسانی خودکار غیرفعال شد');
     } else {
         // فعال کردن
-        startAutoRefresh();
+        autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
         btn.textContent = '⏰ بروزرسانی خودکار: فعال';
         btn.style.background = '#27ae60';
-        autoRefreshEnabled = true;
         console.log('▶️ بروزرسانی خودکار فعال شد');
     }
 }
 
 function startAutoRefresh() {
     // توقف interval قبلی
-    if (window.autoRefreshInterval) {
-        clearInterval(window.autoRefreshInterval);
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
     }
     
     // شروع interval جدید
-    window.autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
+    autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
 }
 
 // راه‌اندازی سیستم
@@ -483,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // مدیریت رویدادهای صفحه
 window.addEventListener('beforeunload', function() {
-    if (window.autoRefreshInterval) {
-        clearInterval(window.autoRefreshInterval);
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
     }
 });
