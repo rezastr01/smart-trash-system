@@ -1,8 +1,8 @@
 // تنظیمات سیستم
 const CHANNEL_ID = '3116788';
 const API_KEY = 'FOB57VQ57OC6VAP8';
-const UPDATE_TIME = 10000; // 10 ثانیه
-const OFFLINE_THRESHOLD = 30000; // 30 ثانیه بدون داده = آفلاین
+const UPDATE_TIME = 8000; // 8 ثانیه
+const OFFLINE_THRESHOLD = 15000; // 15 ثانیه بدون داده = آفلاین
 
 // اطلاعات سطل‌های دانشگاه مهارت ملی
 const trashCans = [
@@ -167,6 +167,8 @@ function updateMarkerPopup(marker, trash) {
 // دریافت داده از Thingspeak
 async function fetchData() {
     try {
+        console.log('📡 در حال دریافت داده از Thingspeak...');
+        
         const response = await fetch(
             `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}`
         );
@@ -182,6 +184,7 @@ async function fetchData() {
         if (data && data.created_at) {
             isOnline = true;
             lastDataReceived = Date.now();
+            console.log('✅ داده معتبر دریافت شد - سیستم آنلاین');
             
             // همیشه داده رو پردازش کن، حتی اگر 0% باشه
             if (data.field1 !== null && data.field2 !== null) {
@@ -235,13 +238,17 @@ function checkOnlineStatus() {
     
     if (!lastDataReceived) {
         // اگر هیچ داده‌ای دریافت نشده
+        console.log('🔴 هیچ داده‌ای دریافت نشده - سیستم آفلاین');
         setSystemOffline();
         return;
     }
     
-    // اگر بیش از 30 ثانیه از آخرین داده گذشته
+    // اگر بیش از 15 ثانیه از آخرین داده گذشته
     const timeSinceLastData = now - lastDataReceived;
+    console.log(`⏰ ${Math.round(timeSinceLastData/1000)} ثانیه از آخرین داده گذشته`);
+    
     if (timeSinceLastData > OFFLINE_THRESHOLD) {
+        console.log('🔴 زمان دریافت داده منقضی شد - سیستم آفلاین');
         setSystemOffline();
     } else {
         setSystemOnline();
@@ -266,6 +273,8 @@ function setSystemOffline() {
         const realTrash = trashCans.find(trash => trash.isReal);
         if (realTrash) {
             realTrash.status = 'unknown';
+            realTrash.fill = 0;
+            realTrash.distance = 0;
         }
         
         updateAllDisplays(1);
@@ -483,8 +492,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // شروع بروزرسانی خودکار
     startAutoRefresh();
     
-    // شروع چک کردن وضعیت آنلاین هر 5 ثانیه
-    setInterval(checkOnlineStatus, 5000);
+    // شروع چک کردن وضعیت آنلاین هر 3 ثانیه
+    setInterval(checkOnlineStatus, 3000);
     
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
