@@ -42,6 +42,7 @@ let markers = [];
 let isOnline = false;
 let updateCount = 0;
 let lastSuccessfulUpdate = null;
+let autoRefreshEnabled = true; // وضعیت بروزرسانی خودکار
 
 // ایجاد نقشه
 function initMap() {
@@ -429,35 +430,55 @@ function refreshData() {
     fetchData();
 }
 
-// تابع بروزرسانی خودکار
+// تابع بروزرسانی خودکار - تصحیح شده
 function toggleAutoRefresh() {
     const btn = document.getElementById('autoRefreshBtn');
-    if (btn.textContent.includes('فعال')) {
+    
+    if (autoRefreshEnabled) {
+        // غیرفعال کردن
         clearInterval(window.autoRefreshInterval);
         btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
         btn.style.background = '#e74c3c';
+        autoRefreshEnabled = false;
+        console.log('⏸️ بروزرسانی خودکار غیرفعال شد');
     } else {
+        // فعال کردن
         startAutoRefresh();
         btn.textContent = '⏰ بروزرسانی خودکار: فعال';
         btn.style.background = '#27ae60';
+        autoRefreshEnabled = true;
+        console.log('▶️ بروزرسانی خودکار فعال شد');
     }
 }
 
 function startAutoRefresh() {
+    // توقف interval قبلی
     if (window.autoRefreshInterval) {
         clearInterval(window.autoRefreshInterval);
     }
     
+    // شروع interval جدید
     window.autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
 }
 
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
+    
+    // مقداردهی اولیه
     initMap();
     updateAllDisplays();
+    
+    // شروع بروزرسانی خودکار
     startAutoRefresh();
+    
+    // شروع چک کردن وضعیت آنلاین
     setInterval(checkSystemOnline, 5000);
+    
+    // اولین دریافت داده
     setTimeout(fetchData, 2000);
+    
+    console.log('✅ سیستم وب آماده به کار است');
 });
 
 // مدیریت رویدادهای صفحه
