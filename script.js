@@ -488,59 +488,11 @@ function startAutoRefresh() {
     window.autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
 }
 
-// تابع کالیبراسیون (نمایشی)
-function updateCalibration() {
-    const emptyDistance = document.getElementById('emptyDistance').value;
-    const fullDistance = document.getElementById('fullDistance').value;
-    
-    console.log('⚙️ ذخیره تنظیمات کالیبراسیون:');
-    console.log('📏 فاصله سطل خالی:', emptyDistance + 'cm');
-    console.log('📏 فاصله سطل پر:', fullDistance + 'cm');
-    
-    alert('تنظیمات کالیبراسیون ذخیره شد!\nاین تنظیمات در نسخه نمایشی اعمال می‌شوند.');
-}
-
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
     console.log('💡 فقط سطل اول اطلاعات واقعی دریافت می‌کند');
     console.log('🎭 سطل‌های ۲ و ۳ در حالت دمو هستند');
-    
-    // ایجاد دکمه‌های کنترل در صورت عدم وجود
-    if (!document.querySelector('.controls')) {
-        const header = document.querySelector('.header');
-        const controlsHTML = `
-            <div class="controls">
-                <button onclick="refreshData()" class="btn btn-primary">🔄 بروزرسانی</button>
-                <button onclick="toggleAutoRefresh()" class="btn btn-secondary" id="autoRefreshBtn">
-                    ⏰ بروزرسانی خودکار: فعال
-                </button>
-            </div>
-        `;
-        header.insertAdjacentHTML('beforeend', controlsHTML);
-    }
-    
-    // ایجاد بخش کالیبراسیون در صورت عدم وجود
-    if (!document.querySelector('.calibration-section')) {
-        const mapSection = document.querySelector('.map-section');
-        const calibrationHTML = `
-            <div class="calibration-section">
-                <h2>⚙️ تنظیمات و کالیبراسیون</h2>
-                <div class="calibration-card">
-                    <div class="calibration-item">
-                        <label>فاصله سطل خالی (cm):</label>
-                        <input type="number" id="emptyDistance" value="50" min="10" max="200">
-                    </div>
-                    <div class="calibration-item">
-                        <label>فاصله سطل پر (cm):</label>
-                        <input type="number" id="fullDistance" value="5" min="0" max="20">
-                    </div>
-                    <button onclick="updateCalibration()" class="btn btn-calibrate">💾 ذخیره تنظیمات</button>
-                </div>
-            </div>
-        `;
-        mapSection.insertAdjacentHTML('afterend', calibrationHTML);
-    }
     
     // مقداردهی اولیه
     initMap();
