@@ -116,122 +116,4 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
-</html><!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سیستم سطل زباله هوشمند - دانشگاه مهارت ملی</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-</head>
-<body>
-    <div class="container">
-        <header class="header">
-            <h1>🚮 سیستم سطل زباله هوشمند</h1>
-            <p class="subtitle">دانشگاه مهارت ملی | پایش لحظه‌ای</p>
-            <div class="controls">
-                <button onclick="refreshData()" class="btn btn-primary">🔄 بروزرسانی</button>
-                <button onclick="toggleAutoRefresh()" class="btn btn-secondary" id="autoRefreshBtn">
-                    ⏰ بروزرسانی خودکار: فعال
-                </button>
-            </div>
-        </header>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-icon">🗑️</div>
-                <div class="stat-info">
-                    <h3>تعداد سطل‌ها</h3>
-                    <div class="stat-value" id="totalCans">3</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🟢</div>
-                <div class="stat-info">
-                    <h3>سطل‌های خالی</h3>
-                    <div class="stat-value" id="emptyCans">0</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🔴</div>
-                <div class="stat-info">
-                    <h3>سطل‌های پر</h3>
-                    <div class="stat-value" id="fullCans">0</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">📡</div>
-                <div class="stat-info">
-                    <h3>وضعیت</h3>
-                    <div class="stat-value" id="connectionStatus">آفلاین</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="map-section">
-            <h2>🗺️ نقشه موقعیت سطل‌ها</h2>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="color green"></div>
-                    <span>خالی</span>
-                </div>
-                <div class="legend-item">
-                    <div class="color orange"></div>
-                    <span>نیمه پر</span>
-                </div>
-                <div class="legend-item">
-                    <div class="color red"></div>
-                    <span>پر</span>
-                </div>
-                <div class="legend-item">
-                    <div class="color gray"></div>
-                    <span>آفلاین</span>
-                </div>
-            </div>
-            <div id="map"></div>
-        </div>
-
-        <div class="current-info">
-            <h2>📊 اطلاعات سطل فعال</h2>
-            <div class="info-card">
-                <div class="gauge-container">
-                    <div class="gauge">
-                        <div class="gauge-fill" id="gaugeFill"></div>
-                        <div class="gauge-text" id="gaugeText">0%</div>
-                    </div>
-                </div>
-                <div class="details">
-                    <div class="detail-row">
-                        <span>نام سطل:</span>
-                        <strong id="trashName">سطل اصلی</strong>
-                    </div>
-                    <div class="detail-row">
-                        <span>فاصله:</span>
-                        <strong id="trashDistance">- cm</strong>
-                    </div>
-                    <div class="detail-row">
-                        <span>وضعیت:</span>
-                        <strong id="trashStatus">نامشخص</strong>
-                    </div>
-                    <div class="detail-row">
-                        <span>آخرین بروزرسانی:</span>
-                        <strong id="lastUpdate">-</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="trash-list">
-            <h2>📋 لیست سطل‌ها</h2>
-            <div id="trashList" class="list">
-                <!-- لیست سطل‌ها -->
-            </div>
-        </div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="script.js"></script>
-</body>
 </html>
