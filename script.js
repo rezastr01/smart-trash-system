@@ -1,7 +1,7 @@
 // تنظیمات سیستم
 const CHANNEL_ID = '3116788';
 const API_KEY = 'FOB57VQ57OC6VAP8';
-const UPDATE_TIME = 8000; // 8 ثانیه
+const UPDATE_TIME = 10000; // 10 ثانیه
 const OFFLINE_THRESHOLD = 15000; // 15 ثانیه بدون داده = آفلاین
 
 // اطلاعات سطل‌های دانشگاه مهارت ملی
@@ -167,8 +167,6 @@ function updateMarkerPopup(marker, trash) {
 // دریافت داده از Thingspeak
 async function fetchData() {
     try {
-        console.log('📡 در حال دریافت داده از Thingspeak...');
-        
         const response = await fetch(
             `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}`
         );
@@ -178,15 +176,13 @@ async function fetchData() {
         }
         
         const data = await response.json();
-        console.log('📊 داده دریافتی:', data);
         
         // اگر داده معتبر دریافت شد
         if (data && data.created_at) {
             isOnline = true;
             lastDataReceived = Date.now();
-            console.log('✅ داده معتبر دریافت شد - سیستم آنلاین');
             
-            // همیشه داده رو پردازش کن، حتی اگر 0% باشه
+            // پردازش داده
             if (data.field1 !== null && data.field2 !== null) {
                 processThingSpeakData(data);
             }
@@ -195,8 +191,6 @@ async function fetchData() {
         }
         
     } catch (error) {
-        console.error('❌ خطا در دریافت داده:', error);
-        // در صورت خطا وضعیت آنلاین رو چک کن
         checkOnlineStatus();
     }
 }
@@ -205,8 +199,6 @@ async function fetchData() {
 function processThingSpeakData(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
-    
-    console.log(`🔄 پردازش داده: ${fillPercentage}% | فاصله: ${distance}cm`);
     
     let status;
     if (fillPercentage >= 80) {
@@ -237,18 +229,13 @@ function checkOnlineStatus() {
     const now = Date.now();
     
     if (!lastDataReceived) {
-        // اگر هیچ داده‌ای دریافت نشده
-        console.log('🔴 هیچ داده‌ای دریافت نشده - سیستم آفلاین');
         setSystemOffline();
         return;
     }
     
     // اگر بیش از 15 ثانیه از آخرین داده گذشته
     const timeSinceLastData = now - lastDataReceived;
-    console.log(`⏰ ${Math.round(timeSinceLastData/1000)} ثانیه از آخرین داده گذشته`);
-    
     if (timeSinceLastData > OFFLINE_THRESHOLD) {
-        console.log('🔴 زمان دریافت داده منقضی شد - سیستم آفلاین');
         setSystemOffline();
     } else {
         setSystemOnline();
@@ -259,7 +246,6 @@ function checkOnlineStatus() {
 function setSystemOnline() {
     if (!isOnline) {
         isOnline = true;
-        console.log('✅ سیستم آنلاین شد');
         updateAllDisplays(1);
     }
 }
@@ -268,7 +254,6 @@ function setSystemOnline() {
 function setSystemOffline() {
     if (isOnline) {
         isOnline = false;
-        console.log('🔴 سیستم آفلاین شد');
         
         const realTrash = trashCans.find(trash => trash.isReal);
         if (realTrash) {
@@ -447,7 +432,6 @@ function getStatusColor(status) {
 
 // تابع بروزرسانی دستی
 function refreshData() {
-    console.log('🔄 بروزرسانی دستی داده‌ها...');
     fetchData();
 }
 
@@ -461,13 +445,11 @@ function toggleAutoRefresh() {
         autoRefreshInterval = null;
         btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
         btn.style.background = '#e74c3c';
-        console.log('⏸️ بروزرسانی خودکار غیرفعال شد');
     } else {
         // فعال کردن
         autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
         btn.textContent = '⏰ بروزرسانی خودکار: فعال';
         btn.style.background = '#27ae60';
-        console.log('▶️ بروزرسانی خودکار فعال شد');
     }
 }
 
@@ -483,8 +465,6 @@ function startAutoRefresh() {
 
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
-    
     // مقداردهی اولیه
     initMap();
     updateAllDisplays();
@@ -492,13 +472,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // شروع بروزرسانی خودکار
     startAutoRefresh();
     
-    // شروع چک کردن وضعیت آنلاین هر 3 ثانیه
-    setInterval(checkOnlineStatus, 3000);
+    // شروع چک کردن وضعیت آنلاین هر 5 ثانیه
+    setInterval(checkOnlineStatus, 5000);
     
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
-    
-    console.log('✅ سیستم وب آماده به کار است');
 });
 
 // مدیریت رویدادهای صفحه
