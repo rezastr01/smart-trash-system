@@ -45,19 +45,14 @@ let lastSuccessfulUpdate = null;
 
 // ایجاد نقشه
 function initMap() {
-    // ایجاد نقشه با مرکز دانشگاه مهارت ملی
     map = L.map('map').setView([38.043972, 46.268583], 16);
     
-    // اضافه کردن لایه نقشه OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18
     }).addTo(map);
     
-    // ایجاد مارکر برای سطل‌ها
     createMarkers();
-    
-    console.log('🗺️ نقشه با موفقیت ایجاد شد');
 }
 
 // ایجاد مارکرهای سطل‌ها
@@ -73,10 +68,8 @@ function createMarkers() {
             trash: trash
         });
         
-        // آپدیت پاپ‌آپ مارکر
         updateMarkerPopup(marker, trash);
         
-        // فقط برای سطل واقعی event کلیک فعال باشه
         if (trash.isReal) {
             marker.on('click', function() {
                 updateCurrentTrashDisplay(trash.id);
@@ -173,8 +166,6 @@ function updateMarkerPopup(marker, trash) {
 // دریافت داده از Thingspeak
 async function fetchData() {
     try {
-        console.log('📡 درحال دریافت داده از Thingspeak...');
-        
         const response = await fetch(
             `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}`
         );
@@ -184,22 +175,19 @@ async function fetchData() {
         }
         
         const data = await response.json();
-        console.log('📊 داده دریافتی:', data);
         
         if (data && data.field1 && data.field1 !== '0') {
             isOnline = true;
             updateCount++;
             lastSuccessfulUpdate = Date.now();
-            await processThingSpeakData(data);
-            console.log('✅ داده با موفقیت پردازش شد');
+            processThingSpeakData(data);
         } else {
             throw new Error('داده معتبر دریافت نشد');
         }
         
     } catch (error) {
-        console.error('❌ خطا در دریافت داده:', error);
         isOnline = false;
-        checkSystemOnline(); // بررسی وضعیت آفلاین
+        checkSystemOnline();
     }
 }
 
@@ -208,7 +196,6 @@ function processThingSpeakData(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
     
-    // تشخیص وضعیت سطل
     let status;
     if (fillPercentage >= 80) {
         status = 'full';
@@ -218,10 +205,7 @@ function processThingSpeakData(data) {
         status = 'empty';
     }
     
-    // فقط سطل اول (واقعی) رو آپدیت کن
     updateRealTrashCan(status, fillPercentage, distance);
-    
-    // آپدیت تمام نمایش‌ها
     updateAllDisplays(1);
 }
 
@@ -240,20 +224,16 @@ function updateRealTrashCan(status, fillPercentage, distance) {
 function checkSystemOnline() {
     const now = Date.now();
     
-    // اگر هیچ داده موفقی دریافت نشده
     if (!lastSuccessfulUpdate) {
         setSystemOffline();
         return;
     }
     
-    // اگر بیش از 30 ثانیه از آخرین بروزرسانی موفق گذشته
     const timeSinceLastUpdate = now - lastSuccessfulUpdate;
     if (timeSinceLastUpdate > 30000) {
         setSystemOffline();
-        console.log('🚨 سیستم آفلاین تشخیص داده شد');
     } else {
         isOnline = true;
-        console.log('✅ سیستم آنلاین است');
     }
 }
 
@@ -261,7 +241,6 @@ function checkSystemOnline() {
 function setSystemOffline() {
     isOnline = false;
     
-    // آپدیت وضعیت سطل واقعی به آفلاین
     const realTrash = trashCans.find(trash => trash.isReal);
     if (realTrash) {
         realTrash.status = 'unknown';
@@ -269,10 +248,7 @@ function setSystemOffline() {
         realTrash.distance = 0;
     }
     
-    // آپدیت نمایش
     updateAllDisplays(1);
-    
-    console.log('🔴 سیستم در حالت آفلاین');
 }
 
 // آپدیت تمام نمایش‌ها
@@ -289,7 +265,6 @@ function updateMarkers() {
     markers.forEach(markerData => {
         const trash = markerData.trash;
         
-        // فقط اگه سطل واقعیه، آیکونش رو آپدیت کن
         if (trash.isReal) {
             const newIcon = getTrashIcon(trash.status, trash.isReal);
             markerData.marker.setIcon(newIcon);
@@ -307,7 +282,6 @@ function updateTrashList() {
         let statusText, timeText, displayFill, displayDistance, onlineStatus;
         
         if (trash.isReal) {
-            // سطل واقعی - اطلاعات زنده
             statusText = getStatusText(trash.status);
             timeText = trash.lastUpdate ? 
                 trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
@@ -315,7 +289,6 @@ function updateTrashList() {
             displayDistance = trash.distance;
             onlineStatus = isOnline ? '🟢 آنلاین' : '🔴 آفلاین';
         } else {
-            // سطل فیک - اطلاعات ثابت
             statusText = getStatusText(trash.status);
             timeText = 'دمو';
             displayFill = trash.fill;
@@ -357,7 +330,6 @@ function updateTrashList() {
             </div>
         `;
         
-        // فقط برای سطل واقعی event کلیک فعال باشه
         if (trash.isReal) {
             trashItem.addEventListener('click', () => {
                 updateCurrentTrashDisplay(trash.id);
@@ -390,10 +362,8 @@ function updateOverviewCards() {
 function updateCurrentTrashDisplay(trashId) {
     const trash = trashCans.find(t => t.id === trashId) || trashCans[0];
     
-    // فقط سطل واقعی رو نشون بده
     if (!trash.isReal) return;
     
-    // آپدیت اطلاعات اصلی
     document.getElementById('trashName').textContent = trash.name;
     document.getElementById('gaugeText').textContent = trash.fill + '%';
     
@@ -406,7 +376,6 @@ function updateCurrentTrashDisplay(trashId) {
     document.getElementById('lastUpdate').textContent = 
         trash.lastUpdate ? trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
     
-    // مرکز کردن نقشه روی سطل انتخاب شده
     if (map) {
         map.setView(trash.location, 16);
     }
@@ -423,7 +392,6 @@ function updateConnectionStatus() {
         statusElement.textContent = 'آفلاین';
         statusElement.style.color = '#e74c3c';
         
-        // آپدیت اطلاعات سطل فعلی برای حالت آفلاین
         const realTrash = trashCans.find(trash => trash.isReal);
         if (realTrash) {
             document.getElementById('gaugeText').textContent = '0%';
@@ -458,7 +426,6 @@ function getStatusColor(status) {
 
 // تابع بروزرسانی دستی
 function refreshData() {
-    console.log('🔄 بروزرسانی دستی داده‌ها...');
     fetchData();
 }
 
@@ -469,45 +436,28 @@ function toggleAutoRefresh() {
         clearInterval(window.autoRefreshInterval);
         btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
         btn.style.background = '#e74c3c';
-        console.log('⏸️ بروزرسانی خودکار غیرفعال شد');
     } else {
         startAutoRefresh();
         btn.textContent = '⏰ بروزرسانی خودکار: فعال';
         btn.style.background = '#27ae60';
-        console.log('▶️ بروزرسانی خودکار فعال شد');
     }
 }
 
 function startAutoRefresh() {
-    // توقف interval قبلی
     if (window.autoRefreshInterval) {
         clearInterval(window.autoRefreshInterval);
     }
     
-    // شروع interval جدید
     window.autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
 }
 
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
-    console.log('💡 فقط سطل اول اطلاعات واقعی دریافت می‌کند');
-    console.log('🎭 سطل‌های ۲ و ۳ در حالت دمو هستند');
-    
-    // مقداردهی اولیه
     initMap();
     updateAllDisplays();
-    
-    // شروع بروزرسانی خودکار
     startAutoRefresh();
-    
-    // شروع چک کردن وضعیت آنلاین
     setInterval(checkSystemOnline, 5000);
-    
-    // اولین دریافت داده
     setTimeout(fetchData, 2000);
-    
-    console.log('✅ سیستم وب آماده به کار است');
 });
 
 // مدیریت رویدادهای صفحه
@@ -515,5 +465,4 @@ window.addEventListener('beforeunload', function() {
     if (window.autoRefreshInterval) {
         clearInterval(window.autoRefreshInterval);
     }
-    console.log('🛑 توقف سیستم...');
 });
