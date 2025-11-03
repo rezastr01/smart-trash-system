@@ -2,6 +2,7 @@
 const CHANNEL_ID = '3116788';
 const API_KEY = 'FOB57VQ57OC6VAP8';
 const UPDATE_TIME = 10000; // 10 ثانیه
+const OFFLINE_THRESHOLD = 30000; // 30 ثانیه بدون داده = آفلاین
 
 // اطلاعات سطل‌های دانشگاه مهارت ملی
 const trashCans = [
@@ -40,8 +41,7 @@ const trashCans = [
 let map;
 let markers = [];
 let isOnline = false;
-let updateCount = 0;
-let lastSuccessfulUpdate = null;
+let lastDataReceived = null;
 let autoRefreshInterval = null;
 
 // ایجاد نقشه
@@ -176,26 +176,34 @@ async function fetchData() {
         }
         
         const data = await response.json();
+        console.log('📊 داده دریافتی:', data);
         
-        if (data && data.field1 && data.field1 !== '0') {
+        // اگر داده معتبر دریافت شد
+        if (data && data.created_at) {
             isOnline = true;
-            updateCount++;
-            lastSuccessfulUpdate = Date.now();
-            processThingSpeakData(data);
+            lastDataReceived = Date.now();
+            
+            // همیشه داده رو پردازش کن، حتی اگر 0% باشه
+            if (data.field1 !== null && data.field2 !== null) {
+                processThingSpeakData(data);
+            }
         } else {
             throw new Error('داده معتبر دریافت نشد');
         }
         
     } catch (error) {
-        isOnline = false;
-        checkSystemOnline();
+        console.error('❌ خطا در دریافت داده:', error);
+        // در صورت خطا وضعیت آنلاین رو چک کن
+        checkOnlineStatus();
     }
 }
 
-// پردازش داده Thingspeak - فقط سطل واقعی رو آپدیت کن
+// پردازش داده Thingspeak
 function processThingSpeakData(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
+    
+    console.log(`🔄 پردازش داده: ${fillPercentage}% | فاصله: ${distance}cm`);
     
     let status;
     if (fillPercentage >= 80) {
@@ -221,35 +229,47 @@ function updateRealTrashCan(status, fillPercentage, distance) {
     }
 }
 
-// بررسی آنلاین بودن سیستم
-function checkSystemOnline() {
+// بررسی وضعیت آنلاین
+function checkOnlineStatus() {
     const now = Date.now();
     
-    if (!lastSuccessfulUpdate) {
+    if (!lastDataReceived) {
+        // اگر هیچ داده‌ای دریافت نشده
         setSystemOffline();
         return;
     }
     
-    const timeSinceLastUpdate = now - lastSuccessfulUpdate;
-    if (timeSinceLastUpdate > 30000) {
+    // اگر بیش از 30 ثانیه از آخرین داده گذشته
+    const timeSinceLastData = now - lastDataReceived;
+    if (timeSinceLastData > OFFLINE_THRESHOLD) {
         setSystemOffline();
     } else {
+        setSystemOnline();
+    }
+}
+
+// تنظیم وضعیت آنلاین سیستم
+function setSystemOnline() {
+    if (!isOnline) {
         isOnline = true;
+        console.log('✅ سیستم آنلاین شد');
+        updateAllDisplays(1);
     }
 }
 
 // تنظیم وضعیت آفلاین سیستم
 function setSystemOffline() {
-    isOnline = false;
-    
-    const realTrash = trashCans.find(trash => trash.isReal);
-    if (realTrash) {
-        realTrash.status = 'unknown';
-        realTrash.fill = 0;
-        realTrash.distance = 0;
+    if (isOnline) {
+        isOnline = false;
+        console.log('🔴 سیستم آفلاین شد');
+        
+        const realTrash = trashCans.find(trash => trash.isReal);
+        if (realTrash) {
+            realTrash.status = 'unknown';
+        }
+        
+        updateAllDisplays(1);
     }
-    
-    updateAllDisplays(1);
 }
 
 // آپدیت تمام نمایش‌ها
@@ -392,15 +412,6 @@ function updateConnectionStatus() {
     } else {
         statusElement.textContent = 'آفلاین';
         statusElement.style.color = '#e74c3c';
-        
-        const realTrash = trashCans.find(trash => trash.isReal);
-        if (realTrash) {
-            document.getElementById('gaugeText').textContent = '0%';
-            document.getElementById('gaugeFill').style.height = '0%';
-            document.getElementById('trashDistance').textContent = '- cm';
-            document.getElementById('trashStatus').textContent = 'آفلاین';
-            document.getElementById('lastUpdate').textContent = 'آفلاین';
-        }
     }
 }
 
@@ -427,10 +438,11 @@ function getStatusColor(status) {
 
 // تابع بروزرسانی دستی
 function refreshData() {
+    console.log('🔄 بروزرسانی دستی داده‌ها...');
     fetchData();
 }
 
-// تابع بروزرسانی خودکار - کاملاً تصحیح شده
+// تابع بروزرسانی خودکار
 function toggleAutoRefresh() {
     const btn = document.getElementById('autoRefreshBtn');
     
@@ -471,8 +483,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // شروع بروزرسانی خودکار
     startAutoRefresh();
     
-    // شروع چک کردن وضعیت آنلاین
-    setInterval(checkSystemOnline, 5000);
+    // شروع چک کردن وضعیت آنلاین هر 5 ثانیه
+    setInterval(checkOnlineStatus, 5000);
     
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
