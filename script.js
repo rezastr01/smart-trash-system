@@ -12,25 +12,28 @@ const trashCans = [
         status: 'unknown',
         fill: 0,
         distance: 0,
-        lastUpdate: null
+        lastUpdate: null,
+        isReal: true  // این سطل واقعیه
     },
     {
         id: 2,
         name: 'سطل محوطه مرکزی',
         location: [38.044300, 46.268900],
-        status: 'unknown',
+        status: 'empty',
         fill: 0,
-        distance: 0,
-        lastUpdate: null
+        distance: 12,
+        lastUpdate: null,
+        isReal: false  // این سطل فیکه
     },
     {
         id: 3,
         name: 'سطل ورودی شرقی',
         location: [38.043600, 46.268200],
-        status: 'unknown',
+        status: 'empty', 
         fill: 0,
-        distance: 0,
-        lastUpdate: null
+        distance: 10,
+        lastUpdate: null,
+        isReal: false  // این سطل فیکه
     }
 ];
 
@@ -61,7 +64,7 @@ function initMap() {
 function createMarkers() {
     trashCans.forEach(trash => {
         const marker = L.marker(trash.location, {
-            icon: getTrashIcon(trash.status)
+            icon: getTrashIcon(trash.status, trash.isReal)
         }).addTo(map);
         
         markers.push({
@@ -73,15 +76,17 @@ function createMarkers() {
         // آپدیت پاپ‌آپ مارکر
         updateMarkerPopup(marker, trash);
         
-        // اضافه کردن event برای کلیک روی مارکر
-        marker.on('click', function() {
-            updateCurrentTrashDisplay(trash.id);
-        });
+        // فقط برای سطل واقعی event کلیک فعال باشه
+        if (trash.isReal) {
+            marker.on('click', function() {
+                updateCurrentTrashDisplay(trash.id);
+            });
+        }
     });
 }
 
 // ایجاد آیکون سفارشی برای سطل‌ها
-function getTrashIcon(status) {
+function getTrashIcon(status, isReal) {
     let color;
     switch(status) {
         case 'empty': color = '#27ae60'; break;
@@ -90,8 +95,10 @@ function getTrashIcon(status) {
         default: color = '#95a5a6';
     }
     
+    const className = isReal ? 'custom-trash-icon' : 'custom-trash-icon demo';
+    
     return L.divIcon({
-        className: 'custom-trash-icon',
+        className: className,
         html: `
             <div style="
                 background: ${color};
@@ -115,9 +122,18 @@ function getTrashIcon(status) {
 
 // آپدیت پاپ‌آپ مارکر
 function updateMarkerPopup(marker, trash) {
-    const statusText = getStatusText(trash.status);
-    const timeText = trash.lastUpdate ? 
-        trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
+    let statusText, timeText, systemStatus;
+    
+    if (trash.isReal) {
+        statusText = getStatusText(trash.status);
+        timeText = trash.lastUpdate ? 
+            trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
+        systemStatus = isOnline ? '🟢 آنلاین' : '🔴 آفلاین';
+    } else {
+        statusText = getStatusText(trash.status);
+        timeText = 'دمو';
+        systemStatus = '⚪ دمو';
+    }
     
     const popupContent = `
         <div style="padding: 12px; min-width: 220px; font-family: Vazir, sans-serif;">
@@ -145,7 +161,7 @@ function updateMarkerPopup(marker, trash) {
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: #7f8c8d;">وضعیت سیستم:</span>
-                    <strong>${isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</strong>
+                    <strong>${systemStatus}</strong>
                 </div>
             </div>
         </div>
@@ -187,19 +203,14 @@ async function fetchData() {
     }
 }
 
-// پردازش داده Thingspeak
+// پردازش داده Thingspeak - فقط سطل واقعی رو آپدیت کن
 function processThingSpeakData(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
-    const latitude = parseFloat(data.field3);
-    const longitude = parseFloat(data.field4);
-    const isFull = parseInt(data.field5) === 1;
-    const trashId = parseInt(data.field6) || 1;
-    const systemTime = parseInt(data.field7) || Date.now();
     
     // تشخیص وضعیت سطل
     let status;
-    if (fillPercentage >= 80 || isFull) {
+    if (fillPercentage >= 80) {
         status = 'full';
     } else if (fillPercentage >= 50) {
         status = 'half';
@@ -207,27 +218,21 @@ function processThingSpeakData(data) {
         status = 'empty';
     }
     
-    // آپدیت سطل مربوطه
-    updateTrashCan(trashId, status, fillPercentage, distance, latitude, longitude);
+    // فقط سطل اول (واقعی) رو آپدیت کن
+    updateRealTrashCan(status, fillPercentage, distance);
     
     // آپدیت تمام نمایش‌ها
-    updateAllDisplays(trashId);
+    updateAllDisplays(1);
 }
 
-// آپدیت اطلاعات سطل
-function updateTrashCan(id, status, fillPercentage, distance, lat, lng) {
-    const trashIndex = trashCans.findIndex(trash => trash.id === id);
-    if (trashIndex !== -1) {
-        trashCans[trashIndex].status = status;
-        trashCans[trashIndex].fill = fillPercentage;
-        trashCans[trashIndex].distance = distance;
-        trashCans[trashIndex].lastUpdate = new Date();
-        
-        // اگر مختصات جدید ارسال شده
-        if (lat && lng) {
-            trashCans[trashIndex].location[0] = lat;
-            trashCans[trashIndex].location[1] = lng;
-        }
+// آپدیت فقط سطل واقعی
+function updateRealTrashCan(status, fillPercentage, distance) {
+    const realTrash = trashCans.find(trash => trash.isReal);
+    if (realTrash) {
+        realTrash.status = status;
+        realTrash.fill = fillPercentage;
+        realTrash.distance = distance;
+        realTrash.lastUpdate = new Date();
     }
 }
 
@@ -256,12 +261,13 @@ function checkSystemOnline() {
 function setSystemOffline() {
     isOnline = false;
     
-    // آپدیت وضعیت همه سطل‌ها به آفلاین
-    trashCans.forEach(trash => {
-        trash.status = 'unknown';
-        trash.fill = 0;
-        trash.distance = 0;
-    });
+    // آپدیت وضعیت سطل واقعی به آفلاین
+    const realTrash = trashCans.find(trash => trash.isReal);
+    if (realTrash) {
+        realTrash.status = 'unknown';
+        realTrash.fill = 0;
+        realTrash.distance = 0;
+    }
     
     // آپدیت نمایش
     updateAllDisplays(1);
@@ -282,14 +288,13 @@ function updateAllDisplays(activeTrashId = 1) {
 function updateMarkers() {
     markers.forEach(markerData => {
         const trash = markerData.trash;
-        const newIcon = getTrashIcon(trash.status);
-        markerData.marker.setIcon(newIcon);
         
-        // آپدیت موقعیت اگر تغییر کرده
-        markerData.marker.setLatLng(trash.location);
-        
-        // آپدیت پاپ‌آپ
-        updateMarkerPopup(markerData.marker, trash);
+        // فقط اگه سطل واقعیه، آیکونش رو آپدیت کن
+        if (trash.isReal) {
+            const newIcon = getTrashIcon(trash.status, trash.isReal);
+            markerData.marker.setIcon(newIcon);
+            updateMarkerPopup(markerData.marker, trash);
+        }
     });
 }
 
@@ -299,13 +304,30 @@ function updateTrashList() {
     trashList.innerHTML = '';
     
     trashCans.forEach(trash => {
-        const statusText = getStatusText(trash.status);
+        let statusText, timeText, displayFill, displayDistance, onlineStatus;
+        
+        if (trash.isReal) {
+            // سطل واقعی - اطلاعات زنده
+            statusText = getStatusText(trash.status);
+            timeText = trash.lastUpdate ? 
+                trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
+            displayFill = trash.fill;
+            displayDistance = trash.distance;
+            onlineStatus = isOnline ? '🟢 آنلاین' : '🔴 آفلاین';
+        } else {
+            // سطل فیک - اطلاعات ثابت
+            statusText = getStatusText(trash.status);
+            timeText = 'دمو';
+            displayFill = trash.fill;
+            displayDistance = trash.distance;
+            onlineStatus = '⚪ دمو';
+        }
+        
         const statusClass = `state-${trash.status}`;
-        const timeText = trash.lastUpdate ? 
-            trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
+        const demoClass = trash.isReal ? '' : 'demo';
         
         const trashItem = document.createElement('div');
-        trashItem.className = `trash-item ${trash.status}`;
+        trashItem.className = `trash-item ${trash.status} ${demoClass}`;
         trashItem.innerHTML = `
             <div class="trash-header">
                 <div class="trash-title">${trash.name}</div>
@@ -314,11 +336,11 @@ function updateTrashList() {
             <div class="trash-details">
                 <div class="trash-detail">
                     <span>میزان پر:</span>
-                    <span>${trash.fill}%</span>
+                    <span>${displayFill}%</span>
                 </div>
                 <div class="trash-detail">
                     <span>فاصله:</span>
-                    <span>${trash.distance}cm</span>
+                    <span>${displayDistance}cm</span>
                 </div>
                 <div class="trash-detail">
                     <span>کد سطل:</span>
@@ -326,7 +348,7 @@ function updateTrashList() {
                 </div>
                 <div class="trash-detail">
                     <span>وضعیت:</span>
-                    <span>${isOnline ? '🟢 آنلاین' : '🔴 آفلاین'}</span>
+                    <span>${onlineStatus}</span>
                 </div>
                 <div class="trash-detail">
                     <span>آخرین بروزرسانی:</span>
@@ -335,10 +357,14 @@ function updateTrashList() {
             </div>
         `;
         
-        // اضافه کردن event برای کلیک روی آیتم لیست
-        trashItem.addEventListener('click', () => {
-            updateCurrentTrashDisplay(trash.id);
-        });
+        // فقط برای سطل واقعی event کلیک فعال باشه
+        if (trash.isReal) {
+            trashItem.addEventListener('click', () => {
+                updateCurrentTrashDisplay(trash.id);
+            });
+        } else {
+            trashItem.style.cursor = 'not-allowed';
+        }
         
         trashList.appendChild(trashItem);
     });
@@ -346,8 +372,14 @@ function updateTrashList() {
 
 // آپدیت کارت‌های آمار کلی
 function updateOverviewCards() {
-    const emptyCount = trashCans.filter(trash => trash.status === 'empty').length;
-    const fullCount = trashCans.filter(trash => trash.status === 'full').length;
+    const realTrash = trashCans.find(trash => trash.isReal);
+    let emptyCount = 0;
+    let fullCount = 0;
+
+    if (realTrash) {
+        if (realTrash.status === 'empty') emptyCount = 1;
+        if (realTrash.status === 'full') fullCount = 1;
+    }
     
     document.getElementById('emptyCans').textContent = emptyCount;
     document.getElementById('fullCans').textContent = fullCount;
@@ -357,6 +389,9 @@ function updateOverviewCards() {
 // آپدیت نمایش سطل فعلی
 function updateCurrentTrashDisplay(trashId) {
     const trash = trashCans.find(t => t.id === trashId) || trashCans[0];
+    
+    // فقط سطل واقعی رو نشون بده
+    if (!trash.isReal) return;
     
     // آپدیت اطلاعات اصلی
     document.getElementById('trashName').textContent = trash.name;
@@ -389,11 +424,14 @@ function updateConnectionStatus() {
         statusElement.style.color = '#e74c3c';
         
         // آپدیت اطلاعات سطل فعلی برای حالت آفلاین
-        document.getElementById('gaugeText').textContent = '0%';
-        document.getElementById('gaugeFill').style.height = '0%';
-        document.getElementById('trashDistance').textContent = '- cm';
-        document.getElementById('trashStatus').textContent = 'آفلاین';
-        document.getElementById('lastUpdate').textContent = 'آفلاین';
+        const realTrash = trashCans.find(trash => trash.isReal);
+        if (realTrash) {
+            document.getElementById('gaugeText').textContent = '0%';
+            document.getElementById('gaugeFill').style.height = '0%';
+            document.getElementById('trashDistance').textContent = '- cm';
+            document.getElementById('trashStatus').textContent = 'آفلاین';
+            document.getElementById('lastUpdate').textContent = 'آفلاین';
+        }
     }
 }
 
@@ -450,9 +488,59 @@ function startAutoRefresh() {
     window.autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
 }
 
+// تابع کالیبراسیون (نمایشی)
+function updateCalibration() {
+    const emptyDistance = document.getElementById('emptyDistance').value;
+    const fullDistance = document.getElementById('fullDistance').value;
+    
+    console.log('⚙️ ذخیره تنظیمات کالیبراسیون:');
+    console.log('📏 فاصله سطل خالی:', emptyDistance + 'cm');
+    console.log('📏 فاصله سطل پر:', fullDistance + 'cm');
+    
+    alert('تنظیمات کالیبراسیون ذخیره شد!\nاین تنظیمات در نسخه نمایشی اعمال می‌شوند.');
+}
+
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
+    console.log('💡 فقط سطل اول اطلاعات واقعی دریافت می‌کند');
+    console.log('🎭 سطل‌های ۲ و ۳ در حالت دمو هستند');
+    
+    // ایجاد دکمه‌های کنترل در صورت عدم وجود
+    if (!document.querySelector('.controls')) {
+        const header = document.querySelector('.header');
+        const controlsHTML = `
+            <div class="controls">
+                <button onclick="refreshData()" class="btn btn-primary">🔄 بروزرسانی</button>
+                <button onclick="toggleAutoRefresh()" class="btn btn-secondary" id="autoRefreshBtn">
+                    ⏰ بروزرسانی خودکار: فعال
+                </button>
+            </div>
+        `;
+        header.insertAdjacentHTML('beforeend', controlsHTML);
+    }
+    
+    // ایجاد بخش کالیبراسیون در صورت عدم وجود
+    if (!document.querySelector('.calibration-section')) {
+        const mapSection = document.querySelector('.map-section');
+        const calibrationHTML = `
+            <div class="calibration-section">
+                <h2>⚙️ تنظیمات و کالیبراسیون</h2>
+                <div class="calibration-card">
+                    <div class="calibration-item">
+                        <label>فاصله سطل خالی (cm):</label>
+                        <input type="number" id="emptyDistance" value="50" min="10" max="200">
+                    </div>
+                    <div class="calibration-item">
+                        <label>فاصله سطل پر (cm):</label>
+                        <input type="number" id="fullDistance" value="5" min="0" max="20">
+                    </div>
+                    <button onclick="updateCalibration()" class="btn btn-calibrate">💾 ذخیره تنظیمات</button>
+                </div>
+            </div>
+        `;
+        mapSection.insertAdjacentHTML('afterend', calibrationHTML);
+    }
     
     // مقداردهی اولیه
     initMap();
