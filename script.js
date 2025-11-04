@@ -2,7 +2,7 @@
 const CHANNEL_ID = '3116788';
 const API_KEY = 'FOB57VQ57OC6VAP8';
 const UPDATE_TIME = 10000; // 10 ثانیه
-const OFFLINE_THRESHOLD = 15000; // 15 ثانیه بدون داده = آفلاین
+const OFFLINE_THRESHOLD = 15000; // 15 ثانیه
 
 // اطلاعات سطل‌های دانشگاه مهارت ملی
 const trashCans = [
@@ -41,7 +41,7 @@ const trashCans = [
 let map;
 let markers = [];
 let isOnline = false;
-let lastDataReceived = null;
+let lastSuccessfulUpdate = null;
 let autoRefreshInterval = null;
 
 // ایجاد نقشه
@@ -164,11 +164,15 @@ function updateMarkerPopup(marker, trash) {
     marker.bindPopup(popupContent);
 }
 
-// دریافت داده از Thingspeak
+// دریافت داده از Thingspeak - منطق کاملاً جدید
 async function fetchData() {
     try {
+        console.log('🔄 دریافت داده از ThingSpeak...');
+        
+        // اضافه کردن timestamp برای جلوگیری از کش
+        const timestamp = new Date().getTime();
         const response = await fetch(
-            `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}`
+            `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}&round=2&_=${timestamp}`
         );
         
         if (!response.ok) {
@@ -176,22 +180,36 @@ async function fetchData() {
         }
         
         const data = await response.json();
+        console.log('📊 داده دریافتی:', data);
         
-        // اگر داده معتبر دریافت شد
+        // بررسی اینکه آیا داده جدید و معتبر است
         if (data && data.created_at) {
-            isOnline = true;
-            lastDataReceived = Date.now();
+            const dataTime = new Date(data.created_at).getTime();
+            const currentTime = new Date().getTime();
+            const timeDiff = currentTime - dataTime;
             
-            // پردازش داده
-            if (data.field1 !== null && data.field2 !== null) {
-                processThingSpeakData(data);
+            console.log(`⏰ اختلاف زمان: ${Math.round(timeDiff/1000)} ثانیه`);
+            
+            // اگر داده جدیدتر از 20 ثانیه هست
+            if (timeDiff < 20000) {
+                isOnline = true;
+                lastSuccessfulUpdate = Date.now();
+                
+                if (data.field1 && data.field2) {
+                    processThingSpeakData(data);
+                }
+                console.log('✅ سیستم آنلاین - داده جدید');
+            } else {
+                console.log('⚠️ داده قدیمی - احتمال آفلاین بودن');
+                checkSystemOnline();
             }
         } else {
             throw new Error('داده معتبر دریافت نشد');
         }
         
     } catch (error) {
-        checkOnlineStatus();
+        console.error('❌ خطا در دریافت داده:', error);
+        checkSystemOnline();
     }
 }
 
@@ -199,6 +217,8 @@ async function fetchData() {
 function processThingSpeakData(data) {
     const fillPercentage = Math.round(parseFloat(data.field1));
     const distance = parseFloat(data.field2);
+    
+    console.log(`📊 پردازش داده: ${fillPercentage}% | فاصله: ${distance}cm`);
     
     let status;
     if (fillPercentage >= 80) {
@@ -224,20 +244,24 @@ function updateRealTrashCan(status, fillPercentage, distance) {
     }
 }
 
-// بررسی وضعیت آنلاین
-function checkOnlineStatus() {
+// بررسی وضعیت آنلاین - منطق جدید
+function checkSystemOnline() {
     const now = Date.now();
     
-    if (!lastDataReceived) {
+    if (!lastSuccessfulUpdate) {
+        console.log('🔴 هیچ داده موفقی دریافت نشده - آفلاین');
         setSystemOffline();
         return;
     }
     
-    // اگر بیش از 15 ثانیه از آخرین داده گذشته
-    const timeSinceLastData = now - lastDataReceived;
-    if (timeSinceLastData > OFFLINE_THRESHOLD) {
+    const timeSinceLastUpdate = now - lastSuccessfulUpdate;
+    console.log(`⏰ ${Math.round(timeSinceLastUpdate/1000)} ثانیه از آخرین بروزرسانی`);
+    
+    if (timeSinceLastUpdate > OFFLINE_THRESHOLD) {
+        console.log('🔴 سیستم آفلاین تشخیص داده شد');
         setSystemOffline();
     } else {
+        console.log('✅ سیستم آنلاین است');
         setSystemOnline();
     }
 }
@@ -246,6 +270,7 @@ function checkOnlineStatus() {
 function setSystemOnline() {
     if (!isOnline) {
         isOnline = true;
+        console.log('✅ تغییر وضعیت به آنلاین');
         updateAllDisplays(1);
     }
 }
@@ -254,6 +279,7 @@ function setSystemOnline() {
 function setSystemOffline() {
     if (isOnline) {
         isOnline = false;
+        console.log('🔴 تغییر وضعیت به آفلاین');
         
         const realTrash = trashCans.find(trash => trash.isReal);
         if (realTrash) {
@@ -432,6 +458,7 @@ function getStatusColor(status) {
 
 // تابع بروزرسانی دستی
 function refreshData() {
+    console.log('🔄 بروزرسانی دستی...');
     fetchData();
 }
 
@@ -445,11 +472,13 @@ function toggleAutoRefresh() {
         autoRefreshInterval = null;
         btn.textContent = '⏰ بروزرسانی خودکار: غیرفعال';
         btn.style.background = '#e74c3c';
+        console.log('⏸️ بروزرسانی خودکار غیرفعال شد');
     } else {
         // فعال کردن
         autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
         btn.textContent = '⏰ بروزرسانی خودکار: فعال';
         btn.style.background = '#27ae60';
+        console.log('▶️ بروزرسانی خودکار فعال شد');
     }
 }
 
@@ -465,6 +494,8 @@ function startAutoRefresh() {
 
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
+    
     // مقداردهی اولیه
     initMap();
     updateAllDisplays();
@@ -473,10 +504,12 @@ document.addEventListener('DOMContentLoaded', function() {
     startAutoRefresh();
     
     // شروع چک کردن وضعیت آنلاین هر 5 ثانیه
-    setInterval(checkOnlineStatus, 5000);
+    setInterval(checkSystemOnline, 5000);
     
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
+    
+    console.log('✅ سیستم وب آماده به کار است');
 });
 
 // مدیریت رویدادهای صفحه
