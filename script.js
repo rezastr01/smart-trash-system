@@ -2,7 +2,7 @@
 const CHANNEL_ID = '3116788';
 const API_KEY = 'FOB57VQ57OC6VAP8';
 const UPDATE_TIME = 10000; // 10 ثانیه
-const OFFLINE_THRESHOLD = 15000; // 15 ثانیه
+const OFFLINE_THRESHOLD = 30000; // 30 ثانیه
 
 // اطلاعات سطل‌های دانشگاه مهارت ملی
 const trashCans = [
@@ -43,6 +43,15 @@ let markers = [];
 let isOnline = false;
 let lastSuccessfulUpdate = null;
 let autoRefreshInterval = null;
+
+// سیستم آمار و مانیتورینگ
+let systemStats = {
+    totalFetchAttempts: 0,
+    successfulFetches: 0,
+    failedFetches: 0,
+    lastError: null,
+    startupTime: new Date()
+};
 
 // ایجاد نقشه
 function initMap() {
@@ -164,16 +173,23 @@ function updateMarkerPopup(marker, trash) {
     marker.bindPopup(popupContent);
 }
 
-// دریافت داده از Thingspeak - منطق کاملاً جدید
+// دریافت داده از Thingspeak
 async function fetchData() {
+    systemStats.totalFetchAttempts++;
+    
     try {
         console.log('🔄 دریافت داده از ThingSpeak...');
         
-        // اضافه کردن timestamp برای جلوگیری از کش
         const timestamp = new Date().getTime();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
         const response = await fetch(
-            `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}&round=2&_=${timestamp}`
+            `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${API_KEY}&round=2&_=${timestamp}`,
+            { signal: controller.signal }
         );
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
             throw new Error(`خطای HTTP: ${response.status}`);
@@ -182,34 +198,42 @@ async function fetchData() {
         const data = await response.json();
         console.log('📊 داده دریافتی:', data);
         
-        // بررسی اینکه آیا داده جدید و معتبر است
-        if (data && data.created_at) {
+        // بررسی کامل داده
+        if (data && data.created_at && data.field1 !== null && data.field2 !== null) {
             const dataTime = new Date(data.created_at).getTime();
             const currentTime = new Date().getTime();
             const timeDiff = currentTime - dataTime;
             
-            console.log(`⏰ اختلاف زمان: ${Math.round(timeDiff/1000)} ثانیه`);
+            console.log(`⏰ اختلاف زمان با سرور: ${Math.round(timeDiff/1000)} ثانیه`);
             
-            // اگر داده جدیدتر از 20 ثانیه هست
-            if (timeDiff < 20000) {
-                isOnline = true;
+            // فقط اگر داده جدیدتر از 25 ثانیه باشد، پردازش کن
+            if (timeDiff < 25000) {
                 lastSuccessfulUpdate = Date.now();
+                systemStats.successfulFetches++;
+                systemStats.lastError = null;
                 
-                if (data.field1 && data.field2) {
-                    processThingSpeakData(data);
+                processThingSpeakData(data);
+                
+                // فقط اگر آنلاین نیستیم، وضعیت را تغییر دهیم
+                if (!isOnline) {
+                    setSystemOnline();
                 }
-                console.log('✅ سیستم آنلاین - داده جدید');
+                console.log('✅ داده جدید پردازش شد');
             } else {
-                console.log('⚠️ داده قدیمی - احتمال آفلاین بودن');
-                checkSystemOnline();
+                console.log('❌ داده بسیار قدیمی - نادیده گرفته شد');
+                systemStats.failedFetches++;
+                systemStats.lastError = 'داده قدیمی';
+                // وضعیت آنلاین را تغییر نده
             }
         } else {
-            throw new Error('داده معتبر دریافت نشد');
+            throw new Error('داده ناقص یا نامعتبر دریافت شد');
         }
         
     } catch (error) {
-        console.error('❌ خطا در دریافت داده:', error);
-        checkSystemOnline();
+        console.error('❌ خطا در دریافت داده:', error.message);
+        systemStats.failedFetches++;
+        systemStats.lastError = error.message;
+        // در صورت خطا، وضعیت آنلاین را مستقیماً تغییر نده
     }
 }
 
@@ -244,7 +268,7 @@ function updateRealTrashCan(status, fillPercentage, distance) {
     }
 }
 
-// بررسی وضعیت آنلاین - منطق جدید
+// بررسی وضعیت آنلاین
 function checkSystemOnline() {
     const now = Date.now();
     
@@ -255,14 +279,23 @@ function checkSystemOnline() {
     }
     
     const timeSinceLastUpdate = now - lastSuccessfulUpdate;
-    console.log(`⏰ ${Math.round(timeSinceLastUpdate/1000)} ثانیه از آخرین بروزرسانی`);
+    console.log(`⏰ ${Math.round(timeSinceLastUpdate/1000)} ثانیه از آخرین بروزرسانی موفق`);
     
+    // اگر بیش از 30 ثانیه از آخرین بروزرسانی گذشته باشد، آفلاین شود
     if (timeSinceLastUpdate > OFFLINE_THRESHOLD) {
-        console.log('🔴 سیستم آفلاین تشخیص داده شد');
+        console.log('🔴 سیستم آفلاین - داده قدیمی');
         setSystemOffline();
-    } else {
-        console.log('✅ سیستم آنلاین است');
-        setSystemOnline();
+    }
+    // اگر کمتر از 25 ثانیه گذشته باشد و آنلاین نیست، آنلاین شود
+    else if (timeSinceLastUpdate < 25000) {
+        if (!isOnline) {
+            console.log('✅ سیستم آنلاین شد');
+            setSystemOnline();
+        }
+    }
+    // بین 25 تا 30 ثانیه - وضعیت را تغییر نده
+    else {
+        console.log('⚠️ وضعیت نامشخص - حفظ وضعیت فعلی');
     }
 }
 
@@ -270,7 +303,15 @@ function checkSystemOnline() {
 function setSystemOnline() {
     if (!isOnline) {
         isOnline = true;
-        console.log('✅ تغییر وضعیت به آنلاین');
+        console.log('🎉 سیستم آنلاین شد');
+        
+        const realTrash = trashCans.find(trash => trash.isReal);
+        if (realTrash && realTrash.status === 'unknown') {
+            // اگر وضعیت ناشناخته بود، به خالی تغییر بده
+            realTrash.status = 'empty';
+            realTrash.fill = 0;
+        }
+        
         updateAllDisplays(1);
     }
 }
@@ -279,13 +320,14 @@ function setSystemOnline() {
 function setSystemOffline() {
     if (isOnline) {
         isOnline = false;
-        console.log('🔴 تغییر وضعیت به آفلاین');
+        console.log('🔴 سیستم آفلاین شد');
         
         const realTrash = trashCans.find(trash => trash.isReal);
         if (realTrash) {
             realTrash.status = 'unknown';
             realTrash.fill = 0;
             realTrash.distance = 0;
+            realTrash.lastUpdate = new Date(); // زمان آفلاین شدن را ثبت کن
         }
         
         updateAllDisplays(1);
@@ -317,6 +359,8 @@ function updateMarkers() {
 // آپدیت لیست سطل‌ها
 function updateTrashList() {
     const trashList = document.getElementById('trashList');
+    if (!trashList) return;
+    
     trashList.innerHTML = '';
     
     trashCans.forEach(trash => {
@@ -394,9 +438,13 @@ function updateOverviewCards() {
         if (realTrash.status === 'full') fullCount = 1;
     }
     
-    document.getElementById('emptyCans').textContent = emptyCount;
-    document.getElementById('fullCans').textContent = fullCount;
-    document.getElementById('totalCans').textContent = trashCans.length;
+    const emptyCansElement = document.getElementById('emptyCans');
+    const fullCansElement = document.getElementById('fullCans');
+    const totalCansElement = document.getElementById('totalCans');
+    
+    if (emptyCansElement) emptyCansElement.textContent = emptyCount;
+    if (fullCansElement) fullCansElement.textContent = fullCount;
+    if (totalCansElement) totalCansElement.textContent = trashCans.length;
 }
 
 // آپدیت نمایش سطل فعلی
@@ -405,17 +453,27 @@ function updateCurrentTrashDisplay(trashId) {
     
     if (!trash.isReal) return;
     
-    document.getElementById('trashName').textContent = trash.name;
-    document.getElementById('gaugeText').textContent = trash.fill + '%';
+    const trashNameElement = document.getElementById('trashName');
+    const gaugeTextElement = document.getElementById('gaugeText');
+    const gaugeFillElement = document.getElementById('gaugeFill');
+    const trashDistanceElement = document.getElementById('trashDistance');
+    const trashStatusElement = document.getElementById('trashStatus');
+    const lastUpdateElement = document.getElementById('lastUpdate');
     
-    const gaugeFill = document.getElementById('gaugeFill');
-    gaugeFill.style.height = trash.fill + '%';
-    gaugeFill.style.backgroundColor = getStatusColor(trash.status);
+    if (trashNameElement) trashNameElement.textContent = trash.name;
+    if (gaugeTextElement) gaugeTextElement.textContent = trash.fill + '%';
     
-    document.getElementById('trashDistance').textContent = trash.distance + ' cm';
-    document.getElementById('trashStatus').textContent = getStatusText(trash.status);
-    document.getElementById('lastUpdate').textContent = 
-        trash.lastUpdate ? trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
+    if (gaugeFillElement) {
+        gaugeFillElement.style.height = trash.fill + '%';
+        gaugeFillElement.style.backgroundColor = getStatusColor(trash.status);
+    }
+    
+    if (trashDistanceElement) trashDistanceElement.textContent = trash.distance + ' cm';
+    if (trashStatusElement) trashStatusElement.textContent = getStatusText(trash.status);
+    if (lastUpdateElement) {
+        lastUpdateElement.textContent = 
+            trash.lastUpdate ? trash.lastUpdate.toLocaleTimeString('fa-IR') : 'آفلاین';
+    }
     
     if (map) {
         map.setView(trash.location, 16);
@@ -425,6 +483,7 @@ function updateCurrentTrashDisplay(trashId) {
 // آپدیت وضعیت ارتباط
 function updateConnectionStatus() {
     const statusElement = document.getElementById('connectionStatus');
+    if (!statusElement) return;
     
     if (isOnline) {
         statusElement.textContent = 'آنلاین';
@@ -433,6 +492,38 @@ function updateConnectionStatus() {
         statusElement.textContent = 'آفلاین';
         statusElement.style.color = '#e74c3c';
     }
+}
+
+// گزارش وضعیت سیستم
+function logSystemStatus() {
+    const now = new Date();
+    const uptime = Math.round((now - systemStats.startupTime) / 1000);
+    
+    console.log('=== 📊 گزارش وضعیت سیستم ===');
+    console.log('⏰ زمان راه‌اندازی:', systemStats.startupTime.toLocaleTimeString('fa-IR'));
+    console.log('🕒 مدت فعالیت:', uptime, 'ثانیه');
+    console.log('📡 وضعیت آنلاین:', isOnline ? '🟢 آنلاین' : '🔴 آفلاین');
+    console.log('🔄 آخرین بروزرسانی موفق:', 
+        lastSuccessfulUpdate ? new Date(lastSuccessfulUpdate).toLocaleTimeString('fa-IR') : '❌ ندارد');
+    console.log('📈 تلاش‌های دریافت:', systemStats.totalFetchAttempts);
+    console.log('✅ دریافت‌های موفق:', systemStats.successfulFetches);
+    console.log('❌ دریافت‌های ناموفق:', systemStats.failedFetches);
+    
+    if (lastSuccessfulUpdate) {
+        const diff = now.getTime() - lastSuccessfulUpdate;
+        console.log(`⏱️ زمان از آخرین بروزرسانی: ${Math.round(diff/1000)} ثانیه`);
+    }
+    
+    if (systemStats.lastError) {
+        console.log('🚨 آخرین خطا:', systemStats.lastError);
+    }
+    
+    const realTrash = trashCans.find(trash => trash.isReal);
+    if (realTrash) {
+        console.log('🗑️ وضعیت سطل واقعی:', realTrash.status, `(${realTrash.fill}%)`);
+    }
+    
+    console.log('========================');
 }
 
 // توابع کمکی
@@ -465,6 +556,7 @@ function refreshData() {
 // تابع بروزرسانی خودکار
 function toggleAutoRefresh() {
     const btn = document.getElementById('autoRefreshBtn');
+    if (!btn) return;
     
     if (autoRefreshInterval) {
         // غیرفعال کردن
@@ -492,6 +584,34 @@ function startAutoRefresh() {
     autoRefreshInterval = setInterval(fetchData, UPDATE_TIME);
 }
 
+// راه‌اندازی مجدد سیستم
+function restartSystem() {
+    console.log('🔄 راه‌اندازی مجدد سیستم...');
+    
+    // توقف تمام intervalها
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+    
+    // ریست متغیرها
+    isOnline = false;
+    lastSuccessfulUpdate = null;
+    
+    // ریست آمار
+    systemStats = {
+        totalFetchAttempts: 0,
+        successfulFetches: 0,
+        failedFetches: 0,
+        lastError: null,
+        startupTime: new Date()
+    };
+    
+    // راه‌اندازی مجدد
+    startAutoRefresh();
+    
+    console.log('✅ سیستم راه‌اندازی مجدد شد');
+}
+
 // راه‌اندازی سیستم
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 شروع سیستم مدیریت سطل زباله هوشمند...');
@@ -506,6 +626,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // شروع چک کردن وضعیت آنلاین هر 5 ثانیه
     setInterval(checkSystemOnline, 5000);
     
+    // مانیتورینگ سیستم هر 10 ثانیه
+    setInterval(logSystemStatus, 10000);
+    
     // اولین دریافت داده
     setTimeout(fetchData, 2000);
     
@@ -518,3 +641,12 @@ window.addEventListener('beforeunload', function() {
         clearInterval(autoRefreshInterval);
     }
 });
+
+// توابع عمومی برای دسترسی از کنسول
+window.systemControls = {
+    refreshData: fetchData,
+    restartSystem: restartSystem,
+    getStatus: logSystemStatus,
+    checkOnline: checkSystemOnline,
+    getStats: () => systemStats
+};
